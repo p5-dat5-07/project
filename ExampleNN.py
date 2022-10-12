@@ -48,8 +48,9 @@ def main():
   dataset, len_notes = load_data(num_files=num_files)
 
   seq_dataset = create_sequences(dataset=dataset, seq_length=seq_length, vocab_size=vocab_size)
-
+  
   buffer_size = len_notes - seq_length  # the number of items left in the dataset (65)
+
   train_ds = (seq_dataset
               .shuffle(buffer_size)
               .batch(batch_size, drop_remainder=True)
@@ -59,12 +60,12 @@ def main():
   disc_model = create_discriminator()
 
   disc_model.summary()
-
+  
   train(train_ds, 'twinkle-twinkle-little-star.mid', LSTM_model=LSTM_model, disc_model=disc_model)
-
+  '''
   generate_notes(LSTM_model, 'twinkle-twinkle-little-star.mid')
 
-  '''
+  
   train_model(LSTM_model, seq_dataset, len_notes)
 
   generate_notes(LSTM_model, 'twinkle-twinkle-little-star.mid')
@@ -74,10 +75,13 @@ def main():
 
 # ------------ Functions ------------
 #@tf.function
-def train_step(midi_string, LSTM_model, disc_model):
+def train_step(batch, LSTM_model, disc_model):
   LSTM_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
   disc_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+  generated_notes = []
+  print(batch)
 
+  '''
   raw_notes = midi_to_notes(midi_string)
   sample_notes = np.stack([raw_notes[key] for key in key_order], axis=1)
 
@@ -87,28 +91,46 @@ def train_step(midi_string, LSTM_model, disc_model):
     sample_notes[:seq_length] / np.array([vocab_size, 1, 1]))
 
   non_generated_train_notes = tf.expand_dims(input_notes, 0)  
-
-  
+  '''
   with tf.GradientTape() as LSTM_tape, tf.GradientTape() as disc_tape:
     # Generate and reformat notes
-    generated_notes = LSTM_model(non_generated_train_notes, training=True)
+    input = batch
+    predictions = LSTM_model(input, training=True)
+    pitch_logits = predictions['pitch']
+    step = predictions['step']
+    duration = predictions['duration']
 
-    # Pitch divide vecab_size, since thats the format of the input
-    generated_notes = tf.concat([tf.divide(generated_notes['pitch'], [vocab_size]), generated_notes['step'], generated_notes['duration']], -1)
-    generated_notes = tf.slice(generated_notes, [0, 0], [1,75])
-    generated_notes = tf.reshape(generated_notes, (seq_length, 3))
+    pitch_logits /= temperature
+    pitch = tf.random.categorical(pitch_logits, num_samples=1)
+    pitch = tf.squeeze(pitch, axis=-1)
+    duration = tf.squeeze(duration, axis=-1)
+    step = tf.squeeze(step, axis=-1)
 
-    #LSTM_loss = mse_with_positive_pressure(generated_notes['pitch'], tf.ones_like(generated_notes['pitch']))
-    
-    #generated_notes = np.stack([raw_notes[key] for key in key_order], axis=1)
-    
-    #generated_notes = (
-    #  generated_notes[:seq_length] / np.array([vocab_size, 1, 1]))
+    # `step` and `duration` values should be non-negative
+    step = tf.maximum(0, step)
+    duration = tf.maximum(0, duration)
+
+    input.append()
+
+    generated_notes = tf.stack([tf.cast(tf.divide(pitch, [vocab_size]), np.float32), step, duration], 1)
+
+    dataset = tf.data.Dataset.from_tensor_slices(generated_notes)
+    for set in dataset:
+      print(set)
+
+    generated_train_notes = (dataset
+              .shuffle(seq_length)
+              .batch(seq_length, drop_remainder=True)
+              .cache()
+              .prefetch(tf.data.experimental.AUTOTUNE))
+
+    print("GENERATED: ", generated_train_notes)
 
     generated_train_notes = tf.expand_dims(generated_notes, 0)
 
-    real_output = disc_model(non_generated_train_notes, training=True)
-    fake_output = disc_model(generated_train_notes, training=True)
+    real_output = disc_model(batch, training=True)
+    for el in generated_train_notes:
+      fake_output = disc_model(el, training=True)
 
     LSTM_loss = generator_loss(fake_output=fake_output)
     disc_loss = discriminator_loss(real_output=real_output, fake_output=fake_output)
@@ -117,11 +139,11 @@ def train_step(midi_string, LSTM_model, disc_model):
     print("DISC LOSS: ", disc_loss)
     
   
-    gradient_LSTM = LSTM_tape.gradient(LSTM_loss, LSTM_model.trainable_variables)
-    gradient_disc = disc_tape.gradient(disc_loss, disc_model.trainable_variables)
+  gradient_LSTM = LSTM_tape.gradient(LSTM_loss, LSTM_model.trainable_variables)
+  gradient_disc = disc_tape.gradient(disc_loss, disc_model.trainable_variables)
 
-    #print("GRADIENT LSTM: ", gradient_LSTM)
-    #print("GRADIENT DISC: ", gradient_disc)
+  #print("GRADIENT LSTM: ", gradient_LSTM)
+  #print("GRADIENT DISC: ", gradient_disc)
 
   LSTM_optimizer.apply_gradients(zip(gradient_LSTM, LSTM_model.trainable_variables))
   disc_optimizer.apply_gradients(zip(gradient_disc, disc_model.trainable_variables))
@@ -136,7 +158,7 @@ def train(train_dataset, midi_string, LSTM_model, disc_model):
   for epoch in range(epochs):
     for i, batch in enumerate(train_dataset):
       print("Itteration: ", i)
-      train_step(midi_string=midi_string, LSTM_model=LSTM_model, disc_model=disc_model)
+      train_step(batch=batch, LSTM_model=LSTM_model, disc_model=disc_model)
 
     
 
@@ -269,6 +291,8 @@ def load_data(num_files: int):
   return notes_ds, len(all_notes)
   
 def create_model():
+  # seq_length is number of timesteps (how long is the sequence)
+  # 3 is the number of fetures in every timestep (3 for "pitch", "step" and "duration")
   input_shape = (seq_length, 3)  
 
   inputs = tf.keras.Input(input_shape)
@@ -297,32 +321,20 @@ def create_model():
   return model
 
 def create_sequences(dataset: tf.data.Dataset, seq_length: int, vocab_size = 128) -> tf.data.Dataset:
-  """Returns TF Dataset of sequence and label examples."""
-  seq_length = seq_length+1
-
   # Take 1 extra for the labels
   windows = dataset.window(seq_length, shift=1, stride=1,
                               drop_remainder=True)
-  print(windows)
+                       
   # `flat_map` flattens the" dataset of datasets" into a dataset of tensors
   flatten = lambda x: x.batch(seq_length, drop_remainder=True)
   sequences = windows.flat_map(flatten)
-  print(sequences.element_spec)
 
   # Normalize note pitch
   def scale_pitch(x):
     x = x/[vocab_size,1.0,1.0]
     return x
 
-  # Split the labels
-  def split_labels(sequences):
-    inputs = sequences[:-1]
-    labels_dense = sequences[-1]
-    labels = {key:labels_dense[i] for i,key in enumerate(key_order)}
-
-    return inputs, labels
-
-  return sequences.map(split_labels, num_parallel_calls=tf.data.AUTOTUNE)
+  return sequences.map(scale_pitch, num_parallel_calls=tf.data.AUTOTUNE)
 
 def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
   mse = (y_true - y_pred) ** 2
