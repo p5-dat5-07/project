@@ -31,22 +31,20 @@ data_dir = pathlib.Path('data/q-maestro-v2.0.0')
 filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
-learning_rate = 0.01 # Learningrate
-seq_length = 75 # Lenght of every sequence
+learning_rate = 0.001 # Learningrate
+seq_length = 25 # Lenght of every sequence
 batch_size = 32 # Batchsize
 epochs = 1 # Epochs
 vocab_size = 128 # Amount of possible pitches
 num_files = 5 # Number og files for traning
 
 temperature = 3.0
-num_predictions = 75
+num_predictions = 10
 step_in_sec = 16 * 4
 
 key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
 
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-#print(tf.constant([1., 2., 3., 4.]))
-#print(Categorical()(tf.constant([1., 2., 3., 4.])))
 
 def main():
   LSTM_model = create_LSTM_model()
@@ -74,38 +72,45 @@ def train_step(batch, label, LSTM_model, disc_model):
   LSTM_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
   disc_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
-  with tf.GradientTape() as LSTM_tape, tf.GradientTape() as disc_tape:
-    LSTM_tape.watch(batch)
-    input_notes = batch = tf.cast(batch, dtype=tf.float32)
-    label = tf.cast(label, dtype=tf.float32)
+  batch = tf.cast(batch, dtype=tf.float32)
+  label = tf.cast(label, dtype=tf.float32)
 
-    predictions = LSTM_model(input_notes, training=True)
+  g_batch = batch
+  d_batch = batch
+
+  for i in range(num_predictions - 1):
+    with tf.GradientTape() as LSTM_tape, tf.GradientTape() as disc_tape:
+      label_0 = tf.slice(label, [0, 0, 0], [batch_size, 1, 3])
+      label = tf.slice(label, [0, 1, 0], [batch_size, num_predictions - i - 2, 3])
+      
+      predictions = LSTM_model(g_batch, training=True)
+      predictions = tf.divide(predictions, [vocab_size, 1, 1])
+
+      g_batch = tf.slice(g_batch, [0, 1, 0], [batch_size, seq_length - 1, 3])
+      g_batch = tf.concat([g_batch, tf.expand_dims(predictions, 1)], axis=1)
+      d_batch = tf.slice(d_batch, [0, 1, 0], [batch_size, seq_length - 1, 3])
+      d_batch = tf.concat([d_batch, label_0], axis=1)
+
+      print(d_batch[0])
+      print(g_batch[0])
+      
+
+      real_output = disc_model(d_batch, training=True)
+      fake_output = disc_model(g_batch, training=True)
+
+      #print("FAKE: ", fake_output[0])
+      #print("REAL: ", real_output[0])
+
+      LSTM_loss = generator_loss(fake_output=fake_output)
+      disc_loss = discriminator_loss(real_output=real_output, fake_output=fake_output)      
     
-    batch = tf.slice(batch, [0, 1, 0], [batch_size, seq_length - 1, 3])
-    generated_notes = tf.concat([batch, tf.expand_dims(predictions, 1)], axis=1)
-    batch = tf.concat([batch, tf.expand_dims(label, 1)], axis=1)
+    gradient_LSTM = LSTM_tape.gradient(LSTM_loss, LSTM_model.trainable_variables)
+    gradient_disc = disc_tape.gradient(disc_loss, disc_model.trainable_variables)
 
-    real_output = disc_model(batch, training=True)
-    fake_output = disc_model(generated_notes, training=True)
+    LSTM_optimizer.apply_gradients(zip(gradient_LSTM, LSTM_model.trainable_variables))
+    disc_optimizer.apply_gradients(zip(gradient_disc, disc_model.trainable_variables))
 
-    print("BATCH: ", batch[0, seq_length-1])
-    print("NODE: ", generated_notes[0, seq_length-1])
-
-    #print("REAL OUT: ", real_output[0])
-    #print("FAKE OUT: ", fake_output[0])
-
-    LSTM_loss = generator_loss(fake_output=fake_output)
-    disc_loss = discriminator_loss(real_output=real_output, fake_output=fake_output)
-
-    print("LSTM LOSS: ", LSTM_loss)
-    print("DISC LOSS: ", disc_loss)
     
-  
-  gradient_LSTM = LSTM_tape.gradient(LSTM_loss, LSTM_model.trainable_variables)
-  gradient_disc = disc_tape.gradient(disc_loss, disc_model.trainable_variables)
-
-  LSTM_optimizer.apply_gradients(zip(gradient_LSTM, LSTM_model.trainable_variables))
-  disc_optimizer.apply_gradients(zip(gradient_disc, disc_model.trainable_variables))
   
 
 def train(train_dataset, LSTM_model, disc_model):
@@ -131,12 +136,13 @@ def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
   return tf.reduce_mean(mse + positive_pressure)
 
 def create_sequences(dataset: tf.data.Dataset, seq_length: int, vocab_size = 128) -> tf.data.Dataset:
+  seq_length = seq_length + num_predictions
   # Take 1 extra for the labels
-  windows = dataset.window(seq_length + 1, shift=1, stride=1,
+  windows = dataset.window(seq_length, shift=1, stride=1,
                               drop_remainder=True)
                        
   # `flat_map` flattens the" dataset of datasets" into a dataset of tensors
-  flatten = lambda x: x.batch(seq_length + 1, drop_remainder=True)
+  flatten = lambda x: x.batch(seq_length, drop_remainder=True)
   sequences = windows.flat_map(flatten)
 
   # Normalize note pitch
@@ -146,10 +152,10 @@ def create_sequences(dataset: tf.data.Dataset, seq_length: int, vocab_size = 128
 
   # Split the labels
   def split_labels(sequences):
-    inputs = sequences[:-1]
-    labels = sequences[-1]
+    inputs = sequences[:-num_predictions]
+    labels = sequences[-num_predictions:-1]
 
-    return scale_pitch(inputs), labels
+    return scale_pitch(inputs), scale_pitch(labels)
 
   return sequences.map(split_labels, num_parallel_calls=tf.data.AUTOTUNE)
 
@@ -157,7 +163,7 @@ def create_discriminator():
   input_shape = (seq_length, 3) 
 
   inputs = tf.keras.Input(input_shape) 
-  x = tf.keras.layers.LSTM(128)(inputs)
+  x = tf.keras.layers.LSTM(1)(inputs)
 
   outputs = tf.keras.layers.Dense(1, activation="sigmoid")(x)
 
@@ -179,8 +185,8 @@ def create_LSTM_model():
     'duration': tf.keras.layers.Dense(1, name='duration', activation="LeakyReLU")(x),
   }
 
-  pitchLayer = Categorical(128)(dense_layers['pitch'])
-  output = tf.keras.layers.Concatenate(axis=1)([pitchLayer, dense_layers['step'], dense_layers['duration']])
+  pitch_logic = Categorical(128)(dense_layers['pitch'])
+  output = tf.keras.layers.Concatenate(axis=1)([pitch_logic, dense_layers['step'], dense_layers['duration']])
 
   model = tf.keras.Model(inputs, output)
 
