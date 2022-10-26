@@ -1,4 +1,5 @@
 import tensorflow as tf
+import json
 import collections
 import datetime
 import fluidsynth
@@ -35,15 +36,82 @@ seq_length = 75 # Lenght of every sequence
 batch_size = 32 # Batchsize
 epochs = 20 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 50 # Number og files for traning
+num_files = 1 # Number og files for traning
 
 temperature = 3.0
 num_predictions = 10
 step_in_sec = 16 * 4
 
 key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
+'''
+key_dict = {
+  0: C[0,2,4,5,7,9,11], 
+  1: Db[1, 3, 5, 6, 8, 10, 0], 
+  2: D[2, 4, 6, 7, 9,11,1], 
+  3: Eb[3, 5, 7, 8, 10, 0, 2], 
+  4: E[4, 6, 8, 9, 11, 1, 3], 
+  5: F[5, 7, 9, 10, 0, 2, 4, 4], 
+  6: Fsharp[6, 8, 10, 11, 1, 3, 5, 6], 
+  7: G[7, 9, 11, 0, 2, 4, 6, 7], 
+  8: Ab[8, 10, 0, 1, 3, 5, 7], 
+  9: A[9, 11, 1, 2, 4, 6, 8, 9], 
+  10: Bb[10, 0, 2, 3, 5, 7, 9, 10], 
+  11: B[11, 1, 3, 4, 6, 8, 10, 11], 
+  12: c[0, 2, 3, 5, 7, 8, 10], 
+  13: csharp[1, 3, 4, 6, 8, 9, 11], 
+  14: d[2, 4, 5, 7, 9, 10, 0], 
+  15: eb[3, 5, 6, 8, 10, 11, 1], 
+  16: e[4, 6, 7, 9, 11, 0, 2], 
+  17: f, 
+  18: fsharp, 
+  19: g, 
+  20: ab, 
+  21: a, 
+  22: bb, 
+  23: b
+}
+'''
+
+key_dict = {
+  0: [0,2,4,5,7,9,11], 
+  1: [1, 3, 5, 6, 8, 10, 0], 
+  2: [2, 4, 6, 7, 9,11,1], 
+  3: [3, 5, 7, 8, 10, 0, 2], 
+  4: [4, 6, 8, 9, 11, 1, 3], 
+  5: [5, 7, 9, 10, 0, 2, 4], 
+  6: [6, 8, 10, 11, 1, 3, 5], 
+  7: [7, 9, 11, 0, 2, 4, 6], 
+  8: [8, 10, 0, 1, 3, 5, 7], 
+  9: [9, 11, 1, 2, 4, 6, 8, 9], 
+  10: [10, 0, 2, 3, 5, 7, 9, 10], 
+  11: [11, 1, 3, 4, 6, 8, 10, 11], 
+  12: [0, 2, 3, 5, 7, 8, 10], 
+  13: [1, 3, 4, 6, 8, 9, 11], 
+  14: [2, 4, 5, 7, 9, 10, 0], 
+  15: [3, 5, 6, 8, 10, 11, 1], 
+  16: [4, 6, 7, 9, 11, 0, 2], 
+}
+
+def get_key_in_filename(filename):
+  with open("keys.json") as jf:
+    jsonObject = json.load(jf)
+    jf.close()
+
+  for x in jsonObject:
+    if (x['file_path'][2:-1] == filename[5:-1]):
+      return key_dict[x['key']]
 
 def main():
+  index = tf.random.categorical(tf.constant([[0.9,0.1,0.0, 0.0, 0.0], [0.3,0.6,0.1,0.0,0.0]]), num_samples=1)
+
+  y = tf.math.floormod(index, tf.constant(12, dtype=tf.int64))
+
+  
+  print(y)
+
+  current_keys = get_key_in_filename(filenames[0])
+  print(current_keys)
+  
   LSTM_model = create_LSTM_model()
   LSTM_model.summary()
 
@@ -59,8 +127,7 @@ def main():
               .prefetch(tf.data.experimental.AUTOTUNE))
 
   loss = {
-    'pitch': tf.keras.losses.SparseCategoricalCrossentropy(
-        from_logits=True),
+    'pitch': pitch_loss_mt,
     'step': mse_with_positive_pressure,
     'duration': mse_with_positive_pressure,
   }
@@ -97,12 +164,23 @@ def main():
   LSTM_model.save('LSTM.h5')
 
   LSTM_model.evaluate(train_ds, return_dict=True)
+  
 
 
 def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
   mse = (y_true - y_pred) ** 2
   positive_pressure = 10 * step_in_sec * tf.maximum(-y_pred, 0.0)
   return tf.reduce_mean(mse + positive_pressure)
+
+def pitch_loss_mt(y_true: tf.Tensor, y_pred: tf.Tensor):
+  succ = tf.keras.losses.SparseCategoricalCrossentropy(
+        from_logits=True)
+
+  index = tf.random.categorical(y_pred, num_samples=1)
+
+  y = tf.math.floormod(index, tf.constant(12, dtype=tf.int64))
+  
+  return succ(y_true, y_pred) 
 
 def create_LSTM_model():
   # seq_length is number of timesteps (how long is the sequence)
