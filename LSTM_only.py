@@ -13,18 +13,7 @@ import seaborn as sns
 
 from IPython import display
 from matplotlib import pyplot as plt
-from typing import Dict, List, Optional, Sequence, Tuple
-
-class Categorical(tf.keras.layers.Layer):
-  def __init__(self, input_dim):
-    super(Categorical, self).__init__()
-    # Create a non-trainable weight.
-    self.total = tf.Variable([[0]], shape=[None,1], dtype=tf.float32,
-                               trainable=False)
-
-  def call(self, inputs):
-    self.total.assign(tf.cast(tf.random.categorical(inputs, num_samples=1), dtype=tf.float32))
-    return self.total
+from typing import Dict, List, Optional, Sequence
 
 # Collects datasets from api
 data_dir = pathlib.Path('data/q-maestro-v2.0.0')
@@ -95,6 +84,8 @@ key_dict = {
   16: tf.constant([4, 6, 7, 9, 11, 0, 2], dtype=tf.int64),
 }
 
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
 def get_key_in_filename(filename):
   with open("keys.json") as jf:
     jsonObject = json.load(jf)
@@ -135,29 +126,19 @@ def main():
               .batch(batch_size, drop_remainder=True)
               .cache()
               .prefetch(tf.data.experimental.AUTOTUNE))
-
+  
     all_train_ds.append(train_ds)
-  train(LSTM_model, all_train_ds)
-  '''
-  loss = {
-    'pitch': pitch_loss_mt,
-    'step': mse_with_positive_pressure,
-    'duration': mse_with_positive_pressure,
-  }
-
-  optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
   LSTM_model.compile(
-    loss=loss, 
-    loss_weights={
-            'pitch': 0.5,
-            'step': 1.0,
-            'duration':1.0,}, 
     optimizer=optimizer)
 
-  
-  
-  
+  for epoch in range(epochs):
+    print("epoch: ", epoch)
+    train(LSTM_model, all_train_ds)
+    eval(LSTM_model, all_train_ds)
+
+
+  '''
   callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
             filepath='./training_checkpoints/ckpt_{epoch}',
@@ -180,47 +161,67 @@ def main():
   LSTM_model.evaluate(train_ds, return_dict=True)
   '''
 
-def train(model, train_ds):
-  optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-  for epoch in range(epochs):
-    print("\nStart of epoch %d" % (epoch,))
+def eval(model, train_ds):
+  for i, data in enumerate(train_ds):
+    print('___________ file ', i, '___________')
+    # Iterate over the batches of the dataset.
+    for step, (x_batch_train, y_batch_train, keys) in enumerate(data):
+      # Open a GradientTape to record the operations run
+      # during the forward pass, which enables auto-differentiation.
+      with tf.GradientTape() as tape:
 
-    for i, data in enumerate(train_ds):
-      print('___________ file ', i, '___________')
-      # Iterate over the batches of the dataset.
-      for step, (x_batch_train, y_batch_train, filepath) in enumerate(data):
-        # Open a GradientTape to record the operations run
-        # during the forward pass, which enables auto-differentiation.
-        with tf.GradientTape() as tape:
+        # Run the forward pass of the layer.
+        # The operations that the layer applies
+        # to its inputs are going to be recorded
+        # on the GradientTape.
+        logits = model(x_batch_train, training=True)  # Logits for this minibatch
 
-            # Run the forward pass of the layer.
-            # The operations that the layer applies
-            # to its inputs are going to be recorded
-            # on the GradientTape.
-            logits = model(x_batch_train, training=True)  # Logits for this minibatch
+        # Compute the loss value for this minibatch.
+        pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys)
+        step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
+        duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
 
-            # Compute the loss value for this minibatch.
-            pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], filepath=filepath.numpy()[0])
-            step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
-            duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
+        loss = pitch_loss + step_loss + duration_loss
 
-            loss = pitch_loss + step_loss + duration_loss
-
-        # Use the gradient tape to automatically retrieve
-        # the gradients of the trainable variables with respect to the loss.
-        grads = tape.gradient(loss, model.trainable_weights)
-
-        # Run one step of gradient descent by updating
-        # the value of the variables to minimize the loss.
-        optimizer.apply_gradients(zip(grads, model.trainable_weights))
-
-        # Log every 200 batches.
+      # Log every 200 batches.
         if step % 100 == 0:
             print(
-                "Training loss (for one batch) at step %d: %.4f"
-                % (step, float(loss))
+                "Training loss (for one batch) at step %d - pitch: %.4f, step: %.4f, duration: %.4f, "
+                % (step, float(pitch_loss), float(step_loss), float(duration_loss))
             )
             print("Seen so far: %s samples" % ((step + 1) * batch_size))
+
+
+@tf.function
+def train(model, train_ds):
+  for i, data in enumerate(train_ds):
+    print('___________ file ', i, '___________')
+    # Iterate over the batches of the dataset.
+    for step, (x_batch_train, y_batch_train, keys) in enumerate(data):
+      # Open a GradientTape to record the operations run
+      # during the forward pass, which enables auto-differentiation.
+      with tf.GradientTape() as tape:
+
+        # Run the forward pass of the layer.
+        # The operations that the layer applies
+        # to its inputs are going to be recorded
+        # on the GradientTape.
+        logits = model(x_batch_train, training=True)  # Logits for this minibatch
+
+        # Compute the loss value for this minibatch.
+        pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys)
+        step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
+        duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
+
+        loss = pitch_loss + step_loss + duration_loss
+
+      # Use the gradient tape to automatically retrieve
+      # the gradients of the trainable variables with respect to the loss.
+      grads = tape.gradient(loss, model.trainable_weights)
+
+      # Run one step of gradient descent by updating
+      # the value of the variables to minimize the loss.
+      optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
 
 def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
@@ -229,11 +230,10 @@ def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
   positive_pressure = 10 * step_in_sec * tf.maximum(-y_pred, 0.0)
   return tf.reduce_mean(mse + positive_pressure)
 
-def pitch_loss_mt(y_true: tf.Tensor, y_pred: tf.Tensor, filepath: string):
+def pitch_loss_mt(y_true: tf.Tensor, y_pred: tf.Tensor, current_keys: tf.Tensor):
   succ = tf.keras.losses.SparseCategoricalCrossentropy(
-        from_logits=True)
+        from_logits=True) 
   
-  current_keys = get_key_in_filename(filepath)
   if current_keys == None:
     current_keys = tf.constant([0,1,2,3,4,5,6,7,8,9,10,11], dtype=tf.int64)
 
@@ -253,16 +253,13 @@ def create_LSTM_model():
   inputs = tf.keras.Input(input_shape)
   x = tf.keras.layers.LSTM(128)(inputs)
 
-  dense_layers = {
+  outputs = {
     'pitch': tf.keras.layers.Dense(128, name='pitch')(x),
     'step': tf.keras.layers.Dense(1, name='step')(x),
     'duration': tf.keras.layers.Dense(1, name='duration')(x),
-    }
+  }
 
-  #pitch_logic = Categorical(128)(dense_layers['pitch'])
-  output = tf.keras.layers.Concatenate(axis=1)([dense_layers['pitch'], dense_layers['step'], dense_layers['duration']])
-
-  model = tf.keras.Model(inputs, dense_layers)
+  model = tf.keras.Model(inputs, outputs)
 
   return model
 
@@ -294,7 +291,7 @@ def create_sequences(
     labels_dense = sequences[-1]
     labels = {key:labels_dense[i] for i,key in enumerate(key_order)}
 
-    return scale_pitch(inputs), labels, filepath
+    return scale_pitch(inputs), labels, get_key_in_filename(filepath)
   
   return sequences.map(split_labels, num_parallel_calls=tf.data.AUTOTUNE)
 
