@@ -33,8 +33,8 @@ filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
 def main():
-  LSTM_model = tf.keras.models.load_model('mt_LSTM.h4', compile=False)
-  generate_notes(LSTM_model, 'twinkle-twinkle-little-star.mid')
+  LSTM_model = tf.keras.models.load_model('mt_LSTM.h5', compile=False)
+  generate_notes(LSTM_model, filenames[0])
 
 
 def generate_notes(model, midi_string):
@@ -68,7 +68,7 @@ def generate_notes(model, midi_string):
   generated_notes = pd.DataFrame(
     generated_notes, columns=(*key_order, 'start', 'end'))
 
-  print(generated_notes)
+  print(generated_notes.to_string())
 
   
   out_file = 'twinkle2.mid'

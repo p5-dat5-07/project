@@ -21,12 +21,12 @@ data_dir = pathlib.Path('data/q-maestro-v2.0.0')
 filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
-learning_rate = 0.001 # Learningrate
-seq_length = 75 # Lenght of every sequence
-batch_size = 132 # Batchsize
+learning_rate = 0.005 # Learningrate
+seq_length = 25 # Lenght of every sequence
+batch_size = 64 # Batchsize
 epochs = 5 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 50 # Number og files for traning
+num_files = 3 # Number og files for traning
 off_set = 0 # Where to start with the data
 
 temperature = 3.0
@@ -38,6 +38,7 @@ key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 sparse_entrophy = tf.keras.losses.SparseCategoricalCrossentropy(
         from_logits=True) 
+        
 '''
 key_dict = {
   0: C[0,2,4,5,7,9,11], 
@@ -107,27 +108,14 @@ def get_key_in_filename(filename):
       return key_dict[x['key']]
 
 def main():
-  '''
-  index = tf.random.categorical(tf.constant([[0.9,0.1,0.0, 0.0, 0.0]]), num_samples=1)
-
-  current_keys = get_key_in_filename(filenames[0])
-
-  y = tf.math.floormod(index, tf.constant(12, dtype=tf.int64))
-
-  print(y)
-
-  equal = tf.math.equal(y, current_keys)
-
-  print(tf.reduce_any(equal, 1))
-  
-  print(y)
-  '''
   LSTM_model = create_LSTM_model()
   LSTM_model.summary()
-  
+
+  # Loading all the data into datasets of sequences with 3 fetures[pitch, step, duration] shape(seq_length, 3)
+  all_len = 0
   for i, f in enumerate(filenames[off_set:num_files+off_set]):
     dataset, len_notes = load_data(f)
-
+    all_len = all_len + len_notes
     seq_dataset = create_sequences(dataset=dataset, seq_length=seq_length, vocab_size=vocab_size, filepath=f)
 
     if (i == 0):
@@ -135,101 +123,32 @@ def main():
     else:
       collected_ds = collected_ds.concatenate(seq_dataset)
 
-
-
-  buffer_size = len_notes - seq_length  # the number of items left in the dataset 
+  # Shuffle data and divide into batches
+  buffer_size = all_len - seq_length  # the number of items left in the dataset 
   train_ds = (collected_ds
             .shuffle(buffer_size)
             .batch(batch_size, drop_remainder=True)
             .cache()
             .prefetch(tf.data.experimental.AUTOTUNE))
   
-  #eval(LSTM_model, train_ds)
-
-
+  # Train for epochs
   for epoch in range(epochs):
     print("epoch: ", epoch)
     train(LSTM_model, train_ds)
-  
-  eval(LSTM_model, train_ds)
 
-  LSTM_model.save("mt_LSTM.h5")
-
-  '''
-  LSTM_model.compile(
-  optimizer=optimizer)
-  callbacks = [
-        tf.keras.callbacks.ModelCheckpoint(
-            filepath='./training_checkpoints/ckpt_{epoch}',
-            save_weights_only=True),
-        tf.keras.callbacks.EarlyStopping(
-            monitor='loss',
-            patience=5,
-            verbose=1,
-            restore_best_weights=True),
-  ]
-
-  history = LSTM_model.fit(
-      train_ds,
-      epochs=epochs,
-      callbacks=callbacks,
-  ) 
-
-  LSTM_model.save('LSTM.h5')
-
-  LSTM_model.evaluate(train_ds, return_dict=True)
-  '''
-
-def eval(model, train_ds):
-  avg_loss = 0
-  avg_pitch_loss = 0
-  avg_step_loss = 0
-  avg_duration_loss = 0
-  # Iterate over the batches of the dataset.
-  for step, (x_batch_train, y_batch_train, keys) in enumerate(train_ds):
-    # Open a GradientTape to record the operations run
-    # during the forward pass, which enables auto-differentiation.
-    with tf.GradientTape() as tape:
-
-      # Run the forward pass of the layer.
-      # The operations that the layer applies
-      # to its inputs are going to be recorded
-      # on the GradientTape.
-      logits = model(x_batch_train, training=True)  # Logits for this minibatch
-
-      # Compute the loss value for this minibatch.
-      pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys)
-      step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
-      duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
-
-      avg_loss = (avg_loss * step + pitch_loss + step_loss + duration_loss) / (step + 1)
-      avg_pitch_loss = (avg_pitch_loss * step + pitch_loss) / (step + 1)
-      avg_step_loss = (avg_step_loss * step + step_loss) / (step + 1)
-      avg_duration_loss = (avg_duration_loss * step + duration_loss) / (step + 1)
-
-    # Log every 200 batches.
-      if step % 100 == 0:
-          print(
-              "Training loss (avg) at step %d - Loss: %.4f - pitch: %.4f, step: %.4f, duration: %.4f, "
-              % (step, float(avg_loss), float(avg_pitch_loss), float(avg_step_loss), float(avg_duration_loss))
-          )
-          print("Seen so far: %s samples" % ((step + 1) * batch_size))
+  LSTM_model.save("mt_LSTM_only1.h5")
 
 
-@tf.function
+#@tf.function
 def train(model, train_ds):
   all_pitch_loss = 0.0
   all_step_loss = 0.0
   all_duration_loss = 0.0
-  duration_layers = model.trainable_weights[0:5]
-  pitch_layers = model.trainable_weights[0:3] + model.trainable_weights[5:7]
-  step_layers = model.trainable_weights[0:3] + model.trainable_weights[7:9]
 
   for step, (x_batch_train, y_batch_train, keys) in enumerate(train_ds):
-    step = tf.cast(step, dtype=tf.float32)
     # Open a GradientTape to record the operations run
     # during the forward pass, which enables auto-differentiation.
-    with tf.GradientTape(persistent=True) as tape:
+    with tf.GradientTape() as tape:
 
       # Run the forward pass of the layer.
       # The operations that the layer applies
@@ -245,20 +164,16 @@ def train(model, train_ds):
 
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
-    grads_pitch = tape.gradient(pitch_loss, pitch_layers)
-    grads_step = tape.gradient(step_loss, step_layers)
-    grads_duration = tape.gradient(duration_loss, duration_layers)
+    gradients = tape.gradient([pitch_loss, step_loss, duration_loss], model.trainable_variables)
 
     # Run one step of gradient descent by updating
     # the value of the variables to minimize the loss.
-    optimizer.apply_gradients(zip(grads_pitch, pitch_layers))
-    optimizer.apply_gradients(zip(grads_step, step_layers))
-    optimizer.apply_gradients(zip(grads_duration, duration_layers))
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
-      # avg_loss + (pitch_loss + step_loss + duration_loss - avg_loss) / (step + 1)
-    all_pitch_loss =  all_pitch_loss + pitch_loss # avg_pitch_loss + (pitch_loss - avg_pitch_loss) / (step + 1) # (avg_pitch_loss * step + pitch_loss) / (step + 1)
-    all_step_loss = all_step_loss + step_loss # (avg_step_loss * step + step_loss) / (step + 1)
-    all_duration_loss = all_duration_loss + duration_loss # (avg_duration_loss * step + duration_loss) / (step + 1)
+    # Adding loss for print
+    all_pitch_loss =  all_pitch_loss + pitch_loss 
+    all_step_loss = all_step_loss + step_loss 
+    all_duration_loss = all_duration_loss + duration_loss 
 
     # Log every 200 batches.
     if step % 100 == 0:
@@ -300,10 +215,14 @@ def create_LSTM_model():
   inputs = tf.keras.Input(input_shape)
   x = tf.keras.layers.LSTM(128)(inputs)
 
+  ph = tf.keras.layers.Dense(30, name='pitch_hidden')(x)
+  sh = tf.keras.layers.Dense(30, name='step_hidden')(x)
+  dh = tf.keras.layers.Dense(30, name='duration_hidden')(x)
+
   outputs = {
-    'pitch': tf.keras.layers.Dense(128, name='pitch')(x),
-    'step': tf.keras.layers.Dense(1, name='step')(x),
-    'duration': tf.keras.layers.Dense(1, name='duration')(x),
+    'pitch': tf.keras.layers.Dense(128, name='pitch')(ph),
+    'step': tf.keras.layers.Dense(1, name='step')(sh),
+    'duration': tf.keras.layers.Dense(1, name='duration')(dh),
   }
 
   model = tf.keras.Model(inputs, outputs)
@@ -341,8 +260,6 @@ def create_sequences(
     return scale_pitch(inputs), labels, get_key_in_filename(filepath)
   
   return sequences.map(split_labels)
-
-
 
 def load_data(file: string):
   notes = midi_to_notes(file)
