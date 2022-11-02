@@ -23,10 +23,11 @@ print('Number of files:', len(filenames))
 
 learning_rate = 0.001 # Learningrate
 seq_length = 75 # Lenght of every sequence
-batch_size = 32 # Batchsize
-epochs = 20 # Epochs
+batch_size = 132 # Batchsize
+epochs = 5 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 5 # Number og files for traning
+num_files = 50 # Number og files for traning
+off_set = 0 # Where to start with the data
 
 temperature = 3.0
 num_predictions = 10
@@ -67,23 +68,30 @@ key_dict = {
 '''
 
 key_dict = {
-  0: tf.constant([0,2,4,5,7,9,11], dtype=tf.int64), 
+  0: tf.constant([0, 2, 4, 5, 7, 9, 11], dtype=tf.int64), 
   1: tf.constant([1, 3, 5, 6, 8, 10, 0], dtype=tf.int64),
-  2: tf.constant([2, 4, 6, 7, 9,11,1], dtype=tf.int64),
+  2: tf.constant([2, 4, 6, 7, 9, 11, 1], dtype=tf.int64),
   3: tf.constant([3, 5, 7, 8, 10, 0, 2], dtype=tf.int64),
   4: tf.constant([4, 6, 8, 9, 11, 1, 3], dtype=tf.int64),
   5: tf.constant([5, 7, 9, 10, 0, 2, 4], dtype=tf.int64),
   6: tf.constant([6, 8, 10, 11, 1, 3, 5], dtype=tf.int64),
   7: tf.constant([7, 9, 11, 0, 2, 4, 6], dtype=tf.int64), 
   8: tf.constant([8, 10, 0, 1, 3, 5, 7], dtype=tf.int64),
-  9: tf.constant([9, 11, 1, 2, 4, 6, 8, 9], dtype=tf.int64),
-  10: tf.constant([10, 0, 2, 3, 5, 7, 9, 10], dtype=tf.int64),
-  11: tf.constant([11, 1, 3, 4, 6, 8, 10, 11], dtype=tf.int64),
+  9: tf.constant([9, 11, 1, 2, 4, 6, 8], dtype=tf.int64),
+  10: tf.constant([10, 0, 2, 3, 5, 7, 9], dtype=tf.int64),
+  11: tf.constant([11, 1, 3, 4, 6, 8, 10], dtype=tf.int64),
   12: tf.constant([0, 2, 3, 5, 7, 8, 10], dtype=tf.int64),
   13: tf.constant([1, 3, 4, 6, 8, 9, 11], dtype=tf.int64),
   14: tf.constant([2, 4, 5, 7, 9, 10, 0], dtype=tf.int64),
   15: tf.constant([3, 5, 6, 8, 10, 11, 1], dtype=tf.int64),
   16: tf.constant([4, 6, 7, 9, 11, 0, 2], dtype=tf.int64),
+  17: tf.constant([5, 7, 8, 10, 0, 1, 3], dtype=tf.int64),
+  18: tf.constant([6, 8, 9, 11, 1, 2, 4], dtype=tf.int64),
+  19: tf.constant([7, 9, 10, 0, 2, 3, 5], dtype=tf.int64),
+  20: tf.constant([8, 10, 11, 1, 3, 4, 6], dtype=tf.int64),
+  21: tf.constant([9, 11, 0, 2, 4, 5, 7], dtype=tf.int64),
+  22: tf.constant([10, 0, 1, 3, 5, 6, 8], dtype=tf.int64),
+  23: tf.constant([11, 1, 2, 4, 6, 7, 9], dtype=tf.int64),
 }
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
@@ -116,32 +124,36 @@ def main():
   '''
   LSTM_model = create_LSTM_model()
   LSTM_model.summary()
-  dataset = tf.data.Dataset
-  for f in filenames[0:num_files]:
+  
+  for i, f in enumerate(filenames[off_set:num_files+off_set]):
     dataset, len_notes = load_data(f)
 
     seq_dataset = create_sequences(dataset=dataset, seq_length=seq_length, vocab_size=vocab_size, filepath=f)
-    d = tf.data.Dataset.zip(dataset, seq_dataset)
-    dataset = d.map(lambda x,y:tf.concat([x,y],axis=-2))
+
+    if (i == 0):
+      collected_ds = seq_dataset
+    else:
+      collected_ds = collected_ds.concatenate(seq_dataset)
 
 
-  all_seq_data = tf.stack(all_seq_data)
 
   buffer_size = len_notes - seq_length  # the number of items left in the dataset 
-  train_ds = (seq_dataset
+  train_ds = (collected_ds
             .shuffle(buffer_size)
             .batch(batch_size, drop_remainder=True)
             .cache()
             .prefetch(tf.data.experimental.AUTOTUNE))
   
-  eval(LSTM_model, train_ds)
+  #eval(LSTM_model, train_ds)
 
 
   for epoch in range(epochs):
     print("epoch: ", epoch)
     train(LSTM_model, train_ds)
   
-  model.save("mt_LSTM.h4")
+  eval(LSTM_model, train_ds)
+
+  LSTM_model.save("mt_LSTM.h5")
 
   '''
   LSTM_model.compile(
@@ -169,8 +181,12 @@ def main():
   '''
 
 def eval(model, train_ds):
+  avg_loss = 0
+  avg_pitch_loss = 0
+  avg_step_loss = 0
+  avg_duration_loss = 0
   # Iterate over the batches of the dataset.
-  for step, (x_batch_train, y_batch_train, keys) in enumerate(data):
+  for step, (x_batch_train, y_batch_train, keys) in enumerate(train_ds):
     # Open a GradientTape to record the operations run
     # during the forward pass, which enables auto-differentiation.
     with tf.GradientTape() as tape:
@@ -186,54 +202,73 @@ def eval(model, train_ds):
       step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
       duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
 
-      loss = pitch_loss + step_loss + duration_loss
+      avg_loss = (avg_loss * step + pitch_loss + step_loss + duration_loss) / (step + 1)
+      avg_pitch_loss = (avg_pitch_loss * step + pitch_loss) / (step + 1)
+      avg_step_loss = (avg_step_loss * step + step_loss) / (step + 1)
+      avg_duration_loss = (avg_duration_loss * step + duration_loss) / (step + 1)
 
     # Log every 200 batches.
       if step % 100 == 0:
           print(
-              "Training loss (for one batch) at step %d - pitch: %.4f, step: %.4f, duration: %.4f, "
-              % (step, float(pitch_loss), float(step_loss), float(duration_loss))
+              "Training loss (avg) at step %d - Loss: %.4f - pitch: %.4f, step: %.4f, duration: %.4f, "
+              % (step, float(avg_loss), float(avg_pitch_loss), float(avg_step_loss), float(avg_duration_loss))
           )
           print("Seen so far: %s samples" % ((step + 1) * batch_size))
 
 
 @tf.function
 def train(model, train_ds):
+  all_pitch_loss = 0.0
+  all_step_loss = 0.0
+  all_duration_loss = 0.0
   duration_layers = model.trainable_weights[0:5]
   pitch_layers = model.trainable_weights[0:3] + model.trainable_weights[5:7]
   step_layers = model.trainable_weights[0:3] + model.trainable_weights[7:9]
 
-  for i, data in enumerate(train_ds):
-    #print('___________ file ', i, '___________')
-    # Iterate over the batches of the dataset.
-    for step, (x_batch_train, y_batch_train, keys) in enumerate(data):
-      # Open a GradientTape to record the operations run
-      # during the forward pass, which enables auto-differentiation.
-      with tf.GradientTape(persistent=True) as tape:
+  for step, (x_batch_train, y_batch_train, keys) in enumerate(train_ds):
+    step = tf.cast(step, dtype=tf.float32)
+    # Open a GradientTape to record the operations run
+    # during the forward pass, which enables auto-differentiation.
+    with tf.GradientTape(persistent=True) as tape:
 
-        # Run the forward pass of the layer.
-        # The operations that the layer applies
-        # to its inputs are going to be recorded
-        # on the GradientTape.
-        logits = model(x_batch_train, training=True)  # Logits for this minibatch
+      # Run the forward pass of the layer.
+      # The operations that the layer applies
+      # to its inputs are going to be recorded
+      # on the GradientTape.
+      logits = model(x_batch_train, training=True)  # Logits for this minibatch
 
-        # Compute the loss value for this minibatch.
-        # - pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys)
-        pitch_loss = sparse_entrophy(y_batch_train['pitch'], logits['pitch'])
-        step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
-        duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
+      # Compute the loss value for this minibatch.
+      pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys)
+      #pitch_loss = sparse_entrophy(y_batch_train['pitch'], logits['pitch'])
+      step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
+      duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
 
-      # Use the gradient tape to automatically retrieve
-      # the gradients of the trainable variables with respect to the loss.
-      grads_pitch = tape.gradient(pitch_loss, pitch_layers)
-      grads_step = tape.gradient(step_loss, step_layers)
-      grads_duration = tape.gradient(duration_loss, duration_layers)
+    # Use the gradient tape to automatically retrieve
+    # the gradients of the trainable variables with respect to the loss.
+    grads_pitch = tape.gradient(pitch_loss, pitch_layers)
+    grads_step = tape.gradient(step_loss, step_layers)
+    grads_duration = tape.gradient(duration_loss, duration_layers)
 
-      # Run one step of gradient descent by updating
-      # the value of the variables to minimize the loss.
-      optimizer.apply_gradients(zip(grads_pitch, pitch_layers))
-      optimizer.apply_gradients(zip(grads_step, step_layers))
-      optimizer.apply_gradients(zip(grads_duration, duration_layers))
+    # Run one step of gradient descent by updating
+    # the value of the variables to minimize the loss.
+    optimizer.apply_gradients(zip(grads_pitch, pitch_layers))
+    optimizer.apply_gradients(zip(grads_step, step_layers))
+    optimizer.apply_gradients(zip(grads_duration, duration_layers))
+
+      # avg_loss + (pitch_loss + step_loss + duration_loss - avg_loss) / (step + 1)
+    all_pitch_loss =  all_pitch_loss + pitch_loss # avg_pitch_loss + (pitch_loss - avg_pitch_loss) / (step + 1) # (avg_pitch_loss * step + pitch_loss) / (step + 1)
+    all_step_loss = all_step_loss + step_loss # (avg_step_loss * step + step_loss) / (step + 1)
+    all_duration_loss = all_duration_loss + duration_loss # (avg_duration_loss * step + duration_loss) / (step + 1)
+
+    # Log every 200 batches.
+    if step % 100 == 0:
+      avg_pitch_loss = all_pitch_loss / (step + 1)
+      avg_step_loss = all_step_loss / (step + 1)
+      avg_duration_loss = all_duration_loss / (step + 1)
+      tf.print(
+        "Training loss (avg) at step ", step, " - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
+
+
 
 
 def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
