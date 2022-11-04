@@ -14,11 +14,12 @@ from matplotlib import pyplot as plt
 from typing import Dict, List, Optional, Sequence, Tuple
 
 learning_rate = 0.001 # Learningrate
-seq_length = 75 # Lenght of every sequence
+seq_length = 50 # Lenght of every sequence
 batch_size = 32 # Batchsize
 epochs = 50 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 51 # Number og files for traning
+num_files = 7 # Number og files for traning
+off_set = 400 # Where to start with the data
 
 temperature = 2.0
 num_predictions = 200
@@ -33,8 +34,8 @@ filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
 def main():
-  LSTM_model = tf.keras.models.load_model('mt_LSTM.h5', compile=False)
-  generate_notes(LSTM_model, filenames[0])
+  LSTM_model = tf.keras.models.load_model('mt_LSTM_only1.h5', compile=False)
+  generate_notes(LSTM_model, filenames[off_set])
 
 
 def generate_notes(model, midi_string):
@@ -58,7 +59,7 @@ def generate_notes(model, midi_string):
     pitch, step, duration = predict_next_note(input_notes, model, temperature)
     start = prev_start + step
     end = start + duration
-    input_note = (pitch, round(step), round(duration))
+    input_note = (pitch, step, duration)
     generated_notes.append((*input_note, start, end))
     input_notes = np.delete(input_notes, 0, axis=0)
     input_notes = np.append(input_notes, np.expand_dims(tf.divide(input_note, [128, 1, 1]), 0), axis=0)
@@ -71,7 +72,7 @@ def generate_notes(model, midi_string):
   print(generated_notes.to_string())
 
   
-  out_file = 'twinkle2.mid'
+  out_file = 'test2.mid'
   out_pm = notes_to_midi(
     generated_notes, out_file=out_file, instrument_name=instrument_name)
 
@@ -139,8 +140,8 @@ def notes_to_midi(
 
   prev_start = 0
   for i, note in notes.iterrows():
-    start = float(prev_start + (note['step'] / (step_in_sec / 1)))
-    end = float(start + (note['duration'] / (step_in_sec / 1)))
+    start = float(prev_start + note['step'])
+    end = float(start + note['duration'])
     note = pretty_midi.Note(
         velocity=velocity,
         pitch=int(note['pitch']),

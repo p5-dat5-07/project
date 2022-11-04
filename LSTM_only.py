@@ -21,22 +21,26 @@ data_dir = pathlib.Path('data/q-maestro-v2.0.0')
 filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
-learning_rate = 0.005 # Learningrate
-seq_length = 25 # Lenght of every sequence
+learning_rate = 0.001 # Learningrate
+seq_length = 50 # Lenght of every sequence
 batch_size = 64 # Batchsize
-epochs = 5 # Epochs
+epochs = 50 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 3 # Number og files for traning
-off_set = 0 # Where to start with the data
+num_files = 7 # Number og files for traning
+off_set = 500 # Where to start with the data
 
 temperature = 3.0
 num_predictions = 10
 step_in_sec = 16 * 4
 
+norm = 0.25
+
 key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
 
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 sparse_entrophy = tf.keras.losses.SparseCategoricalCrossentropy(
+        from_logits=True) 
+entrophy = tf.keras.losses.CategoricalCrossentropy(
         from_logits=True) 
         
 '''
@@ -130,13 +134,24 @@ def main():
             .batch(batch_size, drop_remainder=True)
             .cache()
             .prefetch(tf.data.experimental.AUTOTUNE))
-  
+
+  # Random testdata
+  step = 500
+  data_x = []
+  data_y = []
+  for i in range(step):
+    data_x = (tf.random.uniform([batch_size,128], minval=0))
+    rand_p = tf.random.uniform([batch_size], minval=0, maxval=128, dtype=tf.int32)
+    rand_p = tf.cast(rand_p, dtype=tf.float32)
+    data_y.append((data_x, {'pitch': rand_p, 'step': tf.random.uniform([batch_size], minval=0), 'duration': tf.random.uniform([batch_size], minval=0)}))
+    #data_y.append((data_x, tf.random.uniform([batch_size, 128])))
+
   # Train for epochs
   for epoch in range(epochs):
     print("epoch: ", epoch)
     train(LSTM_model, train_ds)
 
-  LSTM_model.save("mt_LSTM_only1.h5")
+  LSTM_model.save("LSTM_MT.h5")
 
 
 #@tf.function
@@ -148,27 +163,29 @@ def train(model, train_ds):
   for step, (x_batch_train, y_batch_train, keys) in enumerate(train_ds):
     # Open a GradientTape to record the operations run
     # during the forward pass, which enables auto-differentiation.
-    with tf.GradientTape() as tape:
 
+    with tf.GradientTape() as tape:
       # Run the forward pass of the layer.
       # The operations that the layer applies
       # to its inputs are going to be recorded
       # on the GradientTape.
       logits = model(x_batch_train, training=True)  # Logits for this minibatch
-
+ 
       # Compute the loss value for this minibatch.
-      pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys)
-      #pitch_loss = sparse_entrophy(y_batch_train['pitch'], logits['pitch'])
+      pitch_loss = sparse_entrophy(y_batch_train['pitch'], logits['pitch']) * 0.1
       step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
       duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
 
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
+
     gradients = tape.gradient([pitch_loss, step_loss, duration_loss], model.trainable_variables)
+    grads = [tf.clip_by_norm(g, norm)
+             for g in gradients]
 
     # Run one step of gradient descent by updating
     # the value of the variables to minimize the loss.
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
     # Adding loss for print
     all_pitch_loss =  all_pitch_loss + pitch_loss 
@@ -177,20 +194,23 @@ def train(model, train_ds):
 
     # Log every 200 batches.
     if step % 100 == 0:
+      step = tf.cast(step, dtype=tf.float32)
       avg_pitch_loss = all_pitch_loss / (step + 1)
       avg_step_loss = all_step_loss / (step + 1)
       avg_duration_loss = all_duration_loss / (step + 1)
       tf.print(
         "Training loss (avg) at step ", step, " - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
 
-
+    
+    #if step%100==0:
+    #  print(loss.numpy())
 
 
 def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
   y_true = tf.cast(y_true, dtype=tf.float32)
   mse = (y_true - y_pred) ** 2
-  positive_pressure = 10 * step_in_sec * tf.maximum(-y_pred, 0.0)
-  return tf.reduce_mean(mse + positive_pressure)
+  #positive_pressure = 10 * tf.maximum(-y_pred, 0.0)
+  return tf.reduce_mean(mse)
 
 def pitch_loss_mt(y_true: tf.Tensor, y_pred: tf.Tensor, current_keys: tf.Tensor):
   succ = tf.keras.losses.SparseCategoricalCrossentropy(
@@ -215,14 +235,18 @@ def create_LSTM_model():
   inputs = tf.keras.Input(input_shape)
   x = tf.keras.layers.LSTM(128)(inputs)
 
-  ph = tf.keras.layers.Dense(30, name='pitch_hidden')(x)
-  sh = tf.keras.layers.Dense(30, name='step_hidden')(x)
-  dh = tf.keras.layers.Dense(30, name='duration_hidden')(x)
+  ph1 = tf.keras.layers.Dense(30, name='pitch_hidden1')(x)
+  sh1 = tf.keras.layers.Dense(30, name='step_hidden1')(x)
+  dh1 = tf.keras.layers.Dense(30, name='duration_hidden1')(x)
+
+  ph2 = tf.keras.layers.Dense(30, name='pitch_hidden2')(ph1)
+  sh2 = tf.keras.layers.Dense(30, name='step_hidden2')(sh1)
+  dh2 = tf.keras.layers.Dense(30, name='duration_hidden2')(dh1)
 
   outputs = {
-    'pitch': tf.keras.layers.Dense(128, name='pitch')(ph),
-    'step': tf.keras.layers.Dense(1, name='step')(sh),
-    'duration': tf.keras.layers.Dense(1, name='duration')(dh),
+    'pitch': tf.keras.layers.Dense(128, name='pitch')(ph2),
+    'step': tf.keras.layers.Dense(1, name='step')(sh2),
+    'duration': tf.keras.layers.Dense(1, name='duration')(dh2),
   }
 
   model = tf.keras.Model(inputs, outputs)
@@ -248,8 +272,13 @@ def create_sequences(
 
   # Normalize note pitch
   def scale_pitch(x):
-    x = x/[vocab_size,1.0,1.0]
+    x = x/[vocab_size,1.0,1.0] - [0, 0.5, 0.5]
     return x
+
+  def normalize(x):
+    x['step'] = x['step'] - [0.5]
+    x['duration'] = x['duration'] - [0.5]
+    return {'pitch': x['pitch'], 'step': x['step'], 'duration': x['duration'],}
 
   # Split the labels
   def split_labels(sequences):
@@ -257,7 +286,7 @@ def create_sequences(
     labels_dense = sequences[-1]
     labels = {key:labels_dense[i] for i,key in enumerate(key_order)}
 
-    return scale_pitch(inputs), labels, get_key_in_filename(filepath)
+    return scale_pitch(inputs), normalize(labels), get_key_in_filename(filepath)
   
   return sequences.map(split_labels)
 
@@ -287,8 +316,8 @@ def midi_to_notes(midi_file: str) -> pd.DataFrame:
     notes['pitch'].append(note.pitch)
     notes['start'].append(start)
     notes['end'].append(end)
-    notes['step'].append((start - prev_start) * step_in_sec)
-    notes['duration'].append((end - start) * step_in_sec)
+    notes['step'].append((start - prev_start))
+    notes['duration'].append((end - start))
     prev_start = start
 
   return pd.DataFrame({name: np.array(value) for name, value in notes.items()})
