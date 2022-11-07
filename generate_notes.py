@@ -34,8 +34,8 @@ filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
 def main():
-  LSTM_model = tf.keras.models.load_model('mt_LSTM_only1.h5', compile=False)
-  generate_notes(LSTM_model, filenames[off_set])
+  LSTM_model = tf.keras.models.load_model('MT_s50_b64_e50_f100_o100.h5', compile=False)
+  generate_notes(LSTM_model, 'twinkle-twinkle-little-star.mid')
 
 
 def generate_notes(model, midi_string):
@@ -43,7 +43,7 @@ def generate_notes(model, midi_string):
   instrument_name = pretty_midi.program_to_instrument_name(instrument.program)
 
   raw_notes = midi_to_notes(midi_string)
-  generated_notes = []
+  
 
   sample_notes = np.stack([raw_notes[key] for key in key_order], axis=1)
 
@@ -52,15 +52,23 @@ def generate_notes(model, midi_string):
   input_notes = (
     sample_notes[:seq_length] / np.array([vocab_size, 1, 1]))
 
-  
   prev_start = 0
+  generated_notes = []
+  for x in input_notes:
+    pitch, step, duration = x[0] * vocab_size, x[1], x[2]
+    start = prev_start + step
+    end = start + duration
+    input_note = (pitch, step, duration)
+    generated_notes.append((*input_note, start, end))
+    prev_start = start
+  
   # Generates
   for i in range(num_predictions):
     pitch, step, duration = predict_next_note(input_notes, model, temperature)
     start = prev_start + step
     end = start + duration
-    input_note = (pitch, step, duration)
-    generated_notes.append((*input_note, start, end))
+    generated_notes.append((pitch, step, duration, start, end))
+    input_note = (pitch, step - 0.5, duration - 0.5)
     input_notes = np.delete(input_notes, 0, axis=0)
     input_notes = np.append(input_notes, np.expand_dims(tf.divide(input_note, [128, 1, 1]), 0), axis=0)
 
@@ -72,7 +80,7 @@ def generate_notes(model, midi_string):
   print(generated_notes.to_string())
 
   
-  out_file = 'test2.mid'
+  out_file = '100ftw.mid'
   out_pm = notes_to_midi(
     generated_notes, out_file=out_file, instrument_name=instrument_name)
 
@@ -89,8 +97,8 @@ def predict_next_note(
 
   predictions = keras_model.predict(inputs)
   pitch_logits = predictions['pitch']
-  step = predictions['step']
-  duration = predictions['duration']
+  step = predictions['step'] + 0.5
+  duration = predictions['duration'] + 0.5
 
   pitch_logits /= temperature
   pitch = tf.random.categorical(pitch_logits, num_samples=1)
@@ -120,8 +128,8 @@ def midi_to_notes(midi_file: str) -> pd.DataFrame:
     notes['pitch'].append(note.pitch)
     notes['start'].append(start)
     notes['end'].append(end)
-    notes['step'].append((start - prev_start) * step_in_sec)
-    notes['duration'].append((end - start) * step_in_sec)
+    notes['step'].append((start - prev_start))
+    notes['duration'].append((end - start))
     prev_start = start
 
   return pd.DataFrame({name: np.array(value) for name, value in notes.items()})

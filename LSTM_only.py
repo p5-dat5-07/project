@@ -26,8 +26,10 @@ seq_length = 50 # Lenght of every sequence
 batch_size = 64 # Batchsize
 epochs = 50 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 7 # Number og files for traning
-off_set = 500 # Where to start with the data
+num_files = 5 # Number og files for traning
+num_eval_files = int(num_files / 5)
+off_set = 50 # Where to start with the data
+off_set_eval = 25
 
 temperature = 3.0
 num_predictions = 10
@@ -38,10 +40,6 @@ norm = 0.25
 key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
 
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-sparse_entrophy = tf.keras.losses.SparseCategoricalCrossentropy(
-        from_logits=True) 
-entrophy = tf.keras.losses.CategoricalCrossentropy(
-        from_logits=True) 
         
 '''
 key_dict = {
@@ -134,7 +132,29 @@ def main():
             .batch(batch_size, drop_remainder=True)
             .cache()
             .prefetch(tf.data.experimental.AUTOTUNE))
+  
+  # Loading all the data into datasets of sequences with 3 fetures[pitch, step, duration] shape(seq_length, 3)
+  all_len_eval = 0
+  for i, f in enumerate(filenames[off_set + num_files + off_set_eval:off_set + num_files + off_set_eval + num_eval_files]):
+    dataset, len_notes = load_data(f)
+    all_len_eval = all_len_eval + len_notes
+    seq_dataset = create_sequences(dataset=dataset, seq_length=seq_length, vocab_size=vocab_size, filepath=f)
 
+    if (i == 0):
+      collected_ds = seq_dataset
+    else:
+      collected_ds = collected_ds.concatenate(seq_dataset)
+
+  # Shuffle data and divide into batches
+  buffer_size_eval = all_len - seq_length  # the number of items left in the dataset 
+  eval_ds = (collected_ds
+            .shuffle(buffer_size_eval)
+            .batch(batch_size, drop_remainder=True)
+            .cache()
+            .prefetch(tf.data.experimental.AUTOTUNE))
+
+  
+  '''
   # Random testdata
   step = 500
   data_x = []
@@ -145,20 +165,50 @@ def main():
     rand_p = tf.cast(rand_p, dtype=tf.float32)
     data_y.append((data_x, {'pitch': rand_p, 'step': tf.random.uniform([batch_size], minval=0), 'duration': tf.random.uniform([batch_size], minval=0)}))
     #data_y.append((data_x, tf.random.uniform([batch_size, 128])))
-
+  '''
+  prev_eval_dict = {'pitch': 1000, 'step': 1000, 'duration': 1000}
+  prev_train_dict = {'pitch': 1000, 'step': 1000, 'duration': 1000}
   # Train for epochs
   for epoch in range(epochs):
     print("epoch: ", epoch)
-    train(LSTM_model, train_ds)
+    train_dict = train(LSTM_model, train_ds)
+    eval_dict = eval(LSTM_model, eval_ds)
+    if (epoch > 5 and sum(prev_eval_dict.values()) < sum(eval_dict.values()) and sum(prev_eval_dict.values()) - sum(eval_dict.values()) < sum(prev_train_dict.values()) - sum(train_dict.values())):
+      break
+    prev_eval_dict = eval_dict
+    prev_train_dict = train_dict
 
-  LSTM_model.save("LSTM_MT.h5")
+  LSTM_model.save("MT.h5")
+
+def eval(model, eval_ds):
+  all_pitch_loss = 0.0
+  all_step_loss = 0.0
+  all_duration_loss = 0.0
+  step = 0
+
+  for step, (x_batch_eval, y_batch_eval, keys) in enumerate(eval_ds):
+    logits = model(x_batch_eval)
+
+    pitch_loss = pitch_loss_mt(y_batch_eval['pitch'], logits['pitch'], keys) * 0.1
+    step_loss = mse_with_positive_pressure(y_batch_eval['step'], logits['step'])
+    duration_loss = mse_with_positive_pressure(y_batch_eval['duration'], logits['duration'])
+
+    # Adding loss for print
+    all_pitch_loss =  all_pitch_loss + pitch_loss 
+    all_step_loss = all_step_loss + step_loss 
+    all_duration_loss = all_duration_loss + duration_loss 
+
+    step = step
+
+  return {'pitch': all_pitch_loss / (step + 1), 'dration': all_duration_loss / (step + 1), 'step': all_step_loss / (step + 1)}
 
 
-#@tf.function
+@tf.function
 def train(model, train_ds):
   all_pitch_loss = 0.0
   all_step_loss = 0.0
   all_duration_loss = 0.0
+  step = tf.cast(0, dtype=tf.int64)
 
   for step, (x_batch_train, y_batch_train, keys) in enumerate(train_ds):
     # Open a GradientTape to record the operations run
@@ -172,7 +222,7 @@ def train(model, train_ds):
       logits = model(x_batch_train, training=True)  # Logits for this minibatch
  
       # Compute the loss value for this minibatch.
-      pitch_loss = sparse_entrophy(y_batch_train['pitch'], logits['pitch']) * 0.1
+      pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys) * 0.1
       step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
       duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
 
@@ -192,6 +242,7 @@ def train(model, train_ds):
     all_step_loss = all_step_loss + step_loss 
     all_duration_loss = all_duration_loss + duration_loss 
 
+    step = step
     # Log every 200 batches.
     if step % 100 == 0:
       step = tf.cast(step, dtype=tf.float32)
@@ -200,8 +251,9 @@ def train(model, train_ds):
       avg_duration_loss = all_duration_loss / (step + 1)
       tf.print(
         "Training loss (avg) at step ", step, " - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
-
-    
+  
+  step = tf.cast(step, dtype=tf.float32)
+  return {'pitch': all_pitch_loss / (step + 1), 'dration': all_duration_loss / (step + 1), 'step': all_step_loss / (step + 1)}
     #if step%100==0:
     #  print(loss.numpy())
 
