@@ -26,8 +26,8 @@ seq_length = 50 # Lenght of every sequence
 batch_size = 64 # Batchsize
 epochs = 50 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 7 # Number og files for traning
-off_set = 500 # Where to start with the data
+num_files = 100 # Number og files for traning
+off_set = 100 # Where to start with the data
 
 temperature = 3.0
 num_predictions = 10
@@ -38,10 +38,6 @@ norm = 0.25
 key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
 
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-sparse_entrophy = tf.keras.losses.SparseCategoricalCrossentropy(
-        from_logits=True) 
-entrophy = tf.keras.losses.CategoricalCrossentropy(
-        from_logits=True) 
         
 '''
 key_dict = {
@@ -134,7 +130,7 @@ def main():
             .batch(batch_size, drop_remainder=True)
             .cache()
             .prefetch(tf.data.experimental.AUTOTUNE))
-
+  '''
   # Random testdata
   step = 500
   data_x = []
@@ -145,13 +141,13 @@ def main():
     rand_p = tf.cast(rand_p, dtype=tf.float32)
     data_y.append((data_x, {'pitch': rand_p, 'step': tf.random.uniform([batch_size], minval=0), 'duration': tf.random.uniform([batch_size], minval=0)}))
     #data_y.append((data_x, tf.random.uniform([batch_size, 128])))
-
+  '''
   # Train for epochs
   for epoch in range(epochs):
     print("epoch: ", epoch)
     train(LSTM_model, train_ds)
 
-  LSTM_model.save("LSTM_MT.h5")
+  LSTM_model.save("MT_s50_b64_e50_f100_o100.h5")
 
 
 #@tf.function
@@ -172,7 +168,7 @@ def train(model, train_ds):
       logits = model(x_batch_train, training=True)  # Logits for this minibatch
  
       # Compute the loss value for this minibatch.
-      pitch_loss = sparse_entrophy(y_batch_train['pitch'], logits['pitch']) * 0.1
+      pitch_loss = pitch_loss_mt(y_batch_train['pitch'], logits['pitch'], keys) * 0.1
       step_loss = mse_with_positive_pressure(y_batch_train['step'], logits['step'])
       duration_loss = mse_with_positive_pressure(y_batch_train['duration'], logits['duration'])
 
