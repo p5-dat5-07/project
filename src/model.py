@@ -85,12 +85,12 @@ class Model:
         input_shape = (self.params.sequence_length, 3)  
         input_layer = tf.keras.Input(input_shape)
 
-        x = tf.keras.layers.LSTM(256, return_sequences=True)(input_layer)
+        x = tf.keras.layers.GRU(256, return_sequences=True)(input_layer)
         d1 = tf.keras.layers.Dropout(0.3)(x)
 
-        ph1 = tf.keras.layers.LSTM(128, name="pitch_hidden1")(d1)
-        sh1 = tf.keras.layers.LSTM(128, name="step_hidden1")(d1)
-        dh1 = tf.keras.layers.LSTM(128, name="duration_hidden1")(d1)
+        ph1 = tf.keras.layers.GRU(128, name="pitch_hidden1")(d1)
+        sh1 = tf.keras.layers.GRU(128, name="step_hidden1")(d1)
+        dh1 = tf.keras.layers.GRU(128, name="duration_hidden1")(d1)
 
         d2 = tf.keras.layers.Dropout(0.3)(ph1)
         d3 = tf.keras.layers.Dropout(0.3)(sh1)
@@ -156,38 +156,34 @@ class Model:
         self.model.save( f"./{model_name}/{model_name}.h5")
         with open( f"./{model_name}/{model_name}.json", "w") as f:
             f.write(json.dumps(self.params.to_dict()))
-    
+    @tf.function
+    def train_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
+        with tf.GradientTape() as tape:
+            # Run the forward pass of the layer.
+            # The operations that the layer applies
+            # to its inputs are going to be recorded
+            # on the GradientTape.
+            logits = self.model(x_batch_train, training=True)  # Logits for this minibatch
+        
+            # Compute the loss value for this minibatch.
+            pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
+            step_loss = self.step_loss(y_batch_train["step"], logits["step"]) * self.params.step_loss_scaler
+            duration_loss = self.duration_loss(y_batch_train["duration"], logits["duration"]) * self.params.duration_loss_scaler
+
+        # Use the gradient tape to automatically retrieve
+        # the gradients of the trainable variables with respect to the loss.
+        gradients = tape.gradient([pitch_loss, step_loss, duration_loss], self.model.trainable_variables)
+        grads = [tf.clip_by_norm(g, self.params.normalization)
+                for g in gradients]
+
+        # Run one step of gradient descent by updating
+        # the value of the variables to minimize the loss.
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+        return (pitch_loss, step_loss, duration_loss)
+
     def train(self, training_data: tf.data.Dataset, callback: Callback):
-        all_pitch_loss = 0.0
-        all_step_loss = 0.0
-        all_duration_loss = 0.0
-        step = tf.cast(0, dtype=tf.int64)
         for step, (x_batch_train, y_batch_train, keys) in enumerate(training_data):
-            # Open a GradientTape to record the operations run
-            # during the forward pass, which enables auto-differentiation.
-            with tf.GradientTape() as tape:
-                # Run the forward pass of the layer.
-                # The operations that the layer applies
-                # to its inputs are going to be recorded
-                # on the GradientTape.
-                logits = self.model(x_batch_train, training=True)  # Logits for this minibatch
-            
-                # Compute the loss value for this minibatch.
-                pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
-                step_loss = self.step_loss(y_batch_train["step"], logits["step"]) * self.params.step_loss_scaler
-                duration_loss = self.duration_loss(y_batch_train["duration"], logits["duration"]) * self.params.duration_loss_scaler
-
-                # Use the gradient tape to automatically retrieve
-                # the gradients of the trainable variables with respect to the loss.
-
-            gradients = tape.gradient([pitch_loss, step_loss, duration_loss], self.model.trainable_variables)
-            grads = [tf.clip_by_norm(g, self.params.normalization)
-                    for g in gradients]
-
-            # Run one step of gradient descent by updating
-            # the value of the variables to minimize the loss.
-            self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-            
+            (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
             callback(step, pitch_loss, step_loss, duration_loss)
 
     def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> [tf.data.Dataset]:
