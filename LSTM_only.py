@@ -2,8 +2,7 @@ import string
 import tensorflow as tf
 import json
 import collections
-import datetime
-import fluidsynth
+import os
 import glob
 import numpy as np
 import pathlib
@@ -21,12 +20,14 @@ data_dir = pathlib.Path('data/q-maestro-v2.0.0')
 filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
 
+model_name = 'Model1'
+
 learning_rate = 0.001 # Learningrate
 seq_length = 50 # Lenght of every sequence
 batch_size = 64 # Batchsize
 epochs = 50 # Epochs
 vocab_size = 128 # Amount of possible pitches
-num_files = 5 # Number og files for traning
+num_files = 7 # Number og files for traning
 num_eval_files = int(num_files / 5)
 off_set = 50 # Where to start with the data
 off_set_eval = 25
@@ -99,6 +100,9 @@ key_dict = {
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
+train_loss = []
+eval_loss = []
+
 def get_key_in_filename(filename):
   with open("keys.json") as jf:
     jsonObject = json.load(jf)
@@ -168,17 +172,48 @@ def main():
   '''
   prev_eval_dict = {'pitch': 1000, 'step': 1000, 'duration': 1000}
   prev_train_dict = {'pitch': 1000, 'step': 1000, 'duration': 1000}
+
   # Train for epochs
   for epoch in range(epochs):
     print("epoch: ", epoch)
     train_dict = train(LSTM_model, train_ds)
+    train_loss.append(train_dict)
     eval_dict = eval(LSTM_model, eval_ds)
-    if (epoch > 5 and sum(prev_eval_dict.values()) < sum(eval_dict.values()) and sum(prev_eval_dict.values()) - sum(eval_dict.values()) < sum(prev_train_dict.values()) - sum(train_dict.values())):
+    eval_loss.append(eval_dict)
+
+    train_diff = sum(prev_train_dict.values()) - sum(train_dict.values())
+    eval_diff = sum(prev_eval_dict.values()) - sum(eval_dict.values())
+    diff = sum(train_dict.values()) - sum(eval_dict.values()) + 5
+
+    if (train_diff.numpy() > 0 and eval_diff.numpy() < 0 and diff < 0):
       break
+
     prev_eval_dict = eval_dict
     prev_train_dict = train_dict
 
-  LSTM_model.save("MT.h5")
+  jf_dict = {
+    'hyperparameters': {'Learning rate' : learning_rate,
+                    'sequence length' : seq_length,
+                    'batch_size' : batch_size,
+                    'Epochs': epochs,
+                    'Number of training files' : num_files,
+                    'Number of evaluation files' : num_eval_files,
+                    'Training offset' : off_set,
+                    'Evaluation offset' : off_set_eval},
+    'training_loss': {'epoch' + str(i): dict(map(lambda item: (item[0], float(item[1].numpy())), x.items())) for i, x in enumerate(train_loss)},
+    'eval_loss': {'epoch' + str(i): dict(map(lambda item: (item[0], float(item[1].numpy())), x.items())) for i, x in enumerate(eval_loss)},
+  }
+
+  json_object = json.dumps(jf_dict, indent=4)
+  current_directory = os.getcwd()
+  final_directory = os.path.join(current_directory, model_name)
+  os.mkdir(final_directory)
+
+  with open(final_directory +'\\loss.json', 'w') as jf:
+    jf.write(json_object)
+    jf.close()
+
+  LSTM_model.save(final_directory +'/MT.h5')
 
 def eval(model, eval_ds):
   all_pitch_loss = 0.0
@@ -254,8 +289,7 @@ def train(model, train_ds):
   
   step = tf.cast(step, dtype=tf.float32)
   return {'pitch': all_pitch_loss / (step + 1), 'dration': all_duration_loss / (step + 1), 'step': all_step_loss / (step + 1)}
-    #if step%100==0:
-    #  print(loss.numpy())
+
 
 
 def mse_with_positive_pressure(y_true: tf.Tensor, y_pred: tf.Tensor):
