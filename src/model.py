@@ -162,7 +162,7 @@ class Model:
         all_step_loss = 0.0
         all_duration_loss = 0.0
         step = tf.cast(0, dtype=tf.int64)
-        for step, (x_batch_train, y_batch_train, keys) in enumerate(training_data):
+        for step, (x_batch_train, y_batch_train, stuff) in enumerate(training_data):
             # Open a GradientTape to record the operations run
             # during the forward pass, which enables auto-differentiation.
             with tf.GradientTape() as tape:
@@ -170,6 +170,8 @@ class Model:
                 # The operations that the layer applies
                 # to its inputs are going to be recorded
                 # on the GradientTape.
+                print(stuff)
+                exit()
                 logits = self.model(x_batch_train, training=True)  # Logits for this minibatch
             
                 # Compute the loss value for this minibatch.
@@ -212,7 +214,10 @@ class Model:
             inputs = sequences[:-1]
             labels_dense = sequences[-1]
             labels = {key:labels_dense[i] for i,key in enumerate(self.key_order)}
-            return scale_pitch(inputs), labels, self.get_key_in_filename(file_path)
+            key = self.get_key_in_filename(file_path)
+            print(labels["step"])
+            exit()
+            return scale_pitch(inputs), labels, self.pitch_loss.preprocessing(key, labels["pitch"])
         
         return sequences.map(split_labels)
 
