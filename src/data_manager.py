@@ -6,15 +6,13 @@ import pathlib
 import collections
 import json
 import os
-from model import Params
 from consts import *
 
 class DataManager:
-    params:         Params
     file_names:     [str]
     key_order:      [str]
 
-    def __init__(self, params: Params, data_directory = "data/q-maestro-v2.0.0"):
+    def __init__(self, params, data_directory = "data/q-maestro-v2.0.0"):
         self.params         = params
         self.files          = glob.glob(str(pathlib.Path(data_directory)/"**/*.mid*"))
         self.file_names     = self.files[self.params.files_offset:self.params.files_offset+self.params.file_count]
