@@ -42,7 +42,7 @@ print('Number of files:', len(filenames))
 learning_rate = 0.001 # Learningrate
 seq_length = 25 # Lenght of every sequence
 batch_size = 32 # Batchsize
-epochs = 1 # Epochs
+epochs = 5 # Epochs
 vocab_size = 128 # Amount of possible pitches
 num_files = 5 # Number og files for traning
 
@@ -102,6 +102,10 @@ def create_generator():
   model.compile(loss=loss, optimizer=optimizer)
 
   return model
+
+  LSTM_model.save('lstm.h5')
+
+  disc_model.save('disc.h5')
 
 
 #@tf.function

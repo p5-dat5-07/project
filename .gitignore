@@ -1,1 +1,4 @@
 data
+*.mid
+training_checkpoints
+__pycache__
