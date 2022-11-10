@@ -1,3 +1,4 @@
+from pickletools import optimize
 import tensorflow as tf
 import collections
 import datetime
@@ -26,7 +27,14 @@ class Categorical(tf.keras.layers.Layer):
 
 
 # Collects datasets from api
-data_dir = pathlib.Path('data/q-maestro-v2.0.0')
+data_dir = pathlib.Path('data/maestro-v2.0.0')
+if not data_dir.exists():
+  tf.keras.utils.get_file(
+      'maestro-v2.0.0-midi.zip',
+      origin='https://storage.googleapis.com/magentadata/datasets/maestro/v2.0.0/maestro-v2.0.0-midi.zip',
+      extract=True,
+      cache_dir='.', cache_subdir='data',
+  )
 
 filenames = glob.glob(str(data_dir/'**/*.mid*'))
 print('Number of files:', len(filenames))
@@ -47,14 +55,15 @@ key_order = ['pitch', 'step', 'duration'] #The order of the inputs in the input
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
 def main():
-  LSTM_model = create_LSTM_model()
-  LSTM_model.summary()
-
+  '''
+  generator = create_generator()
+  generator.summary()
+  
   disc_model = create_discriminator()
   disc_model.summary()
-
+  '''
   dataset, len_notes = load_data(num_files=num_files)
-
+  '''
   seq_dataset = create_sequences(dataset=dataset, seq_length=seq_length, vocab_size=vocab_size)
 
   buffer_size = len_notes - seq_length  # the number of items left in the dataset 
@@ -64,7 +73,35 @@ def main():
               .cache()
               .prefetch(tf.data.experimental.AUTOTUNE))
   
-  train(train_dataset=train_ds, LSTM_model=LSTM_model, disc_model=disc_model)
+  train(train_dataset=train_ds, LSTM_model=generator, disc_model=disc_model)
+  '''
+  
+
+def create_generator():
+  input_shape = (seq_length, 3)
+
+  inputs = tf.keras.Input(input_shape)
+  x = tf.keras.layers.LSTM(128)(inputs)
+
+  outputs = {
+    'pitch': tf.keras.layers.Dense(128, name='pitch')(x),
+    'step': tf.keras.layers.Dense(1, name='step')(x),
+    'duration': tf.keras.layers.Dense(1, name='duration')(x),
+  }
+
+  model = tf.keras.Model(inputs, outputs)
+
+  loss = {
+    'pitch' : tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    'step': mse_with_positive_pressure,
+    'duration': mse_with_positive_pressure,
+  }
+
+  optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+  model.compile(loss=loss, optimizer=optimizer)
+
+  return model
 
 
 #@tf.function
@@ -110,8 +147,9 @@ def train_step(batch, label, LSTM_model, disc_model):
     LSTM_optimizer.apply_gradients(zip(gradient_LSTM, LSTM_model.trainable_variables))
     disc_optimizer.apply_gradients(zip(gradient_disc, disc_model.trainable_variables))
 
-    
-  
+
+
+
 
 def train(train_dataset, LSTM_model, disc_model):
   i = 0
