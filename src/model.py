@@ -156,6 +156,7 @@ class Model:
         self.model.save( f"./{model_name}/{model_name}.h5")
         with open( f"./{model_name}/{model_name}.json", "w") as f:
             f.write(json.dumps(self.params.to_dict()))
+    
     @tf.function
     def train_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
         with tf.GradientTape() as tape:
