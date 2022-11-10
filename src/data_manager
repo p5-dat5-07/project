@@ -1,8 +1,27 @@
-from model import *
+import pandas as pd
+import numpy as np
+import pretty_midi
+import glob
+import pathlib
+import collections
+import json
+import os
+from model import Params
+from consts import *
 
 class DataManager:
+    params:         Params
+    file_names:     [str]
+    key_order:      [str]
 
-    def load_dataset():
+    def __init__(self, params: Params, data_directory = "data/q-maestro-v2.0.0"):
+        self.params         = params
+        self.files          = glob.glob(str(pathlib.Path(data_directory)/"**/*.mid*"))
+        self.file_names     = self.files[self.params.files_offset:self.params.files_offset+self.params.file_count]
+        self.key_order      = ["pitch", "step", "duration"]
+
+
+    def load_dataset(self):
         data = None
         data_length = 0
         # Get data
@@ -76,3 +95,15 @@ class DataManager:
             prev_start = start
 
         return pd.DataFrame({name: np.array(value) for name, value in notes.items()})
+
+
+    def get_key_in_filename(self, file_path: str):
+        with open("project/keys.json") as file:
+            jsonObject = json.load(file)
+            file.close()
+
+        for x in jsonObject:
+            if (x["file_path"][5:-1] == file_path[8:-1]):
+                return x["key"]
+
+
