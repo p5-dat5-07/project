@@ -4,12 +4,10 @@ import numpy as np
 import pretty_midi
 import glob
 import pathlib
-import collections
 import json
 import os
 from tensorflow.keras.layers import GRU, Dense, Dropout, LSTM, Bidirectional
 from callback import Callback
-from dataclasses import dataclass, asdict
 from consts import *
 from data_manager import DataManager
 from args import Params, Train

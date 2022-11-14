@@ -1,7 +1,9 @@
 import pandas as pd
+import numpy as np
 import pretty_midi 
+import collections
 
-def midi_to_notes(self, steps_per_seconds: int, file: str) -> pd.DataFrame:
+def midi_to_notes(file: str, steps_per_second: int) -> pd.DataFrame:
     pm = pretty_midi.PrettyMIDI(file)
     instrument = pm.instruments[0]
     notes = collections.defaultdict(list)
@@ -13,8 +15,8 @@ def midi_to_notes(self, steps_per_seconds: int, file: str) -> pd.DataFrame:
         start = note.start
         end = note.end
         notes["pitch"].append(note.pitch)
-        notes["step"].append((start - prev_start) * steps_per_seconds)
-        notes["duration"].append((end - start) * steps_per_seconds)
+        notes["step"].append((start - prev_start) * steps_per_second)
+        notes["duration"].append((end - start) * steps_per_second)
         prev_start = start
 
     return pd.DataFrame({name: np.array(value) for name, value in notes.items()})
@@ -27,8 +29,8 @@ def notes_to_midi(notes: pd.DataFrame, instrument_name: str, steps_per_second: i
 
     prev_start = 0
     for i, note in notes.iterrows():
-        start = float(prev_start + (note["step"]  / steps_per_seconds))
-        end = float(start + (note["duration"] / steps_per_seconds))
+        start = float(prev_start + (note["step"]  / steps_per_second))
+        end = float(start + (note["duration"] / steps_per_second))
         note = pretty_midi.Note(
             velocity=velocity,
             pitch=int(note["pitch"]),

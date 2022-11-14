@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from simple_parsing import ArgumentParser, subgroups
 @dataclass
 class Base:
@@ -66,7 +66,7 @@ samples_per_epoch:          {self.samples_per_epoch}
 sample_location:            {self.sample_location}
 notes_per_sample:           {self.notes_per_sample}
 sample_temprature:          {self.sample_temprature}
-steps per seconds:          {self.steps_per_seconds}
+steps per second:           {self.steps_per_second}
 normalization:              {self.normalization}
         """
     def to_dict(self) -> dict:
