@@ -5,7 +5,8 @@ from consts import *
 from model import Model
 from callback import Cb1
 from loss import MusicLoss
-from args import parser, Train, Generate, Base
+from args import parser, Train, Generate, Data, Base
+from data_manager import DataManager
 
 def main():
     args = parser.parse_args()
@@ -17,10 +18,14 @@ def main():
         optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate))
     if type(mode) is Train:
         mode: Train = mode
-        model.data_dir = mode.data
         model.create_model()
         model.summary()
+        model.load_dataset(mode.data)
         model.train_model(mode.name, mode.save, callback = Cb1())
+    elif type(mode) is Data: 
+        mode: Data = mode
+        dm = DataManager(params, mode)
+        dm.generate_dataset()
     elif type(mode) is Generate:
         mode: Generate = mode
         model.load(mode.name)

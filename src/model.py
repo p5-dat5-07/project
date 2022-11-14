@@ -11,50 +11,10 @@ from tensorflow.keras.layers import GRU, Dense, Dropout, LSTM, Bidirectional
 from callback import Callback
 from dataclasses import dataclass, asdict
 from consts import *
+from data_manager import DataManager
+from args import Params, Train
 #(16 * 120 / 60)
-@dataclass
-class Params:
-    """ Parameters for ajusting the model """
-    epochs:                 int   = 50      # The amount of Epochs.
-    sequence_length:        int   = 64      # The amount of notes per sequence.
-    batch_size:             int   = 50      # The batch size.
-    learning_rate:          float = 0.001   # The learning rate.
-    pitch_loss_scaler:      float = 0.05    # The amount to scale the pitch loss.
-    step_loss_scaler:       float = 1.0     # The amount to scale the step loss.
-    duration_loss_scaler:   float = 1.0     # The amount to scale the duration loss.
-    vocab_size:             int   = 128     # The amount of pitches in midi file DONT CHANGE!
-    file_count:             int   = 7       # The amount of files to extract notes from.
-    files_offset:           int   = 500     # The file to start from in the dataset.
-    epochs_between_samples: int   = 10      # The amount of epochs between generating sample midi files.
-    samples_per_epoch:      int   = 5       # The amount of midi file samples.
-    sample_location:        int   = 505     # The file to start from in the dataset when generating samples.
-    notes_per_sample:       int   = 200     # The amount of notes to generate per sample.
-    sample_temprature:      int   = 2       # The temprature of the samples.
-    steps_per_seconds:      int   = 1       # The amount of steps per second.
-    normalization:          int   = 0.25    # The normalization value for the gradient.
 
-    def summary(self) -> str:
-        return f"""
-epochs:                     {self.epochs}
-sequence length:            {self.sequence_length}
-batch size:                 {self.batch_size}
-learning rate:              {self.learning_rate}
-pitch loss scaler:          {self.pitch_loss_scaler}
-step loss scaler:           {self.step_loss_scaler}
-duration loss scaler:       {self.duration_loss_scaler}
-vocab size:                 {self.vocab_size}
-file count:                 {self.file_count}
-files offset:               {self.files_offset}
-epochs between samples:     {self.epochs_between_samples}
-samples_per_epoch:          {self.samples_per_epoch}
-sample_location:            {self.sample_location}
-notes_per_sample:           {self.notes_per_sample}
-sample_temprature:          {self.sample_temprature}
-steps per seconds:          {self.steps_per_seconds}
-normalization:              {self.normalization}
-        """
-    def to_dict(self) -> dict:
-        return asdict(self)
 
 class Model:
     params:         Params
@@ -63,21 +23,24 @@ class Model:
     step_loss:      Loss
     duration_loss:  Loss
     optimizer:      Optimizer
-    file_names:     [str]
     key_order:      [str]
+    training_data:  tf.data.Dataset
 
     def __init__(self, params: Params, pitch_loss: Loss, step_loss: Loss, duration_loss: Loss,
-                    optimizer: Optimizer, data_directory = "data/q-maestro-v2.0.0"):
+                    optimizer: Optimizer):
         self.params         = params
         self.pitch_loss     = pitch_loss
         self.step_loss      = step_loss
         self.duration_loss  = duration_loss
         self.optimizer      = optimizer
-        self.files          = glob.glob(str(pathlib.Path(data_directory)/"**/*.mid*"))
-        self.file_names     = self.files[self.params.files_offset:self.params.files_offset+self.params.file_count]
         self.key_order      = ["pitch", "step", "duration"]
+        
     def load(self, model_name):
         self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
+    
+    def load_dataset(self, data_path: str):
+        self.training_data = tf.data.Dataset.load(data_path)
+
     def summary(self):
         print(self.params.summary())
         self.model.summary()
@@ -113,32 +76,6 @@ class Model:
         self.model = tf.keras.Model(input_layer, output_layers)
 
     def train_model(self, model_name: str, save: bool, callback: Callback) -> tf.data.Dataset:
-        data = None
-        data_length = 0
-        # Get data
-        offset = self.params.files_offset
-        file_count = self.params.file_count
-        for file in self.file_names:
-            notes = self.midi_to_notes(file)
-            train_notes = np.stack([notes[key] for key in self.key_order], axis=1)
-            data_length += len(train_notes)
-            notes_dataset = tf.data.Dataset.from_tensor_slices(train_notes)
-            sequences = self.create_sequences(notes_dataset, file)
-            if data == None:
-                data = sequences
-            else: 
-                data = data.concatenate(sequences)
-        # Shuffle data and batch data
-        buffer_size = data_length - self.params.sequence_length  # the number of items left in the dataset 
-        training_data = (data.shuffle(buffer_size)
-                            .batch(self.params.batch_size, drop_remainder=True)
-                            .cache()
-                            .prefetch(tf.data.experimental.AUTOTUNE))
-        
-        if self.params.sample_location + self.params.samples_per_epoch > len(self.files):
-            print(f"Sample location ({self.params.sample_location}) + samples per epoch ({self.params.samples_per_epoch}) has to be lower than the total amount of files ({len(self.files)})!")
-            exit()
-        
         if save:
             if not os.path.exists("./models"):
                 os.mkdir("./models")
@@ -146,12 +83,10 @@ class Model:
             if os.path.exists(f"./models/{model_name}"):
                 print(f"Model with the name {model_name} already exists!")
                 exit()
-
-            os.mkdir(f"./models/{model_name}")
         # Train on data
         for epoch in range(1, self.params.epochs+1):
             print("epoch:", epoch)
-            self.train(training_data, callback)
+            self.train(self.training_data, callback)
             if save and epoch % (self.params.epochs_between_samples) == 0 and epoch > 0:
                 os.mkdir(f"./models/{model_name}/epoch{epoch}")
                 for i in range(1, self.params.samples_per_epoch+1):
@@ -161,6 +96,7 @@ class Model:
         self.model.save( f"./models/{model_name}/{model_name}.h5")
         with open( f"./models/{model_name}/{model_name}.json", "w") as f:
             f.write(json.dumps(self.params.to_dict()))
+    
     @tf.function
     def train_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
         with tf.GradientTape() as tape:
@@ -191,39 +127,11 @@ class Model:
             (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
             callback(step, pitch_loss, step_loss, duration_loss)
 
-    def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> [tf.data.Dataset]:
-        """Returns TF Dataset of sequence and label examples."""
-        sequence_length = self.params.sequence_length+1
-
-        # Take 1 extra for the labels
-        windows = dataset.window(sequence_length, shift=1, stride=1,
-                                    drop_remainder=True)
-
-        # `flat_map` flattens the" dataset of datasets" into a dataset of tensors
-        flatten = lambda x: x.batch(sequence_length, drop_remainder=True)
-        sequences = windows.flat_map(flatten)
-
-        # Normalize note pitch
-        def scale_pitch(x):
-            x = x/[self.params.vocab_size,1.0,1.0]
-            return x
-
-        # Split the labels
-        def split_labels(sequences):
-            inputs = sequences[:-1]
-            labels_dense = sequences[-1]
-            labels = {key:labels_dense[i] for i,key in enumerate(self.key_order)}
-            labels['step'] += [0.001]
-            labels['duration'] += [0.001]
-            return scale_pitch(inputs), labels, self.get_key_in_filename(file_path)
-        
-        return sequences.map(split_labels)
-
     def generate_notes(self, in_file: str, out_file: str):
         instrument = pretty_midi.PrettyMIDI(in_file).instruments[0]
         instrument_name = pretty_midi.program_to_instrument_name(instrument.program)
 
-        raw_notes = self.midi_to_notes(in_file)
+        raw_notes = self.dm.midi_to_notes(in_file)
         generated_notes = {
             "pitch": [],
             "step":  [],
@@ -288,24 +196,6 @@ class Model:
 
         return int(pitch), float(step), float(duration)
     
-    def midi_to_notes(self, file: str) -> pd.DataFrame:
-        pm = pretty_midi.PrettyMIDI(file)
-        instrument = pm.instruments[0]
-        notes = collections.defaultdict(list)
-        # Sort the notes by start time
-        sorted_notes = sorted(instrument.notes, key=lambda note: note.start)
-        prev_start = sorted_notes[0].start
-
-        for note in sorted_notes:
-            start = note.start
-            end = note.end
-            notes["pitch"].append(note.pitch)
-            notes["step"].append((start - prev_start) * self.params.steps_per_seconds)
-            notes["duration"].append((end - start) * self.params.steps_per_seconds)
-            prev_start = start
-
-        return pd.DataFrame({name: np.array(value) for name, value in notes.items()})
-    
     def notes_to_midi(self,
         notes: pd.DataFrame,
         instrument_name: str,
@@ -331,12 +221,4 @@ class Model:
 
         pm.instruments.append(instrument)
         return pm
-     
-    def get_key_in_filename(self, file_path: str):
-        with open("keys.json") as file:
-            jsonObject = json.load(file)
-            file.close()
-
-        for x in jsonObject:
-            if (x["file_path"][5:-1] == file_path[8:-1]):
-                return x["key"]
+    
