@@ -14,4 +14,6 @@ class MusicLoss():
         equal = tf.math.equal(y, keys)
         f = tf.reduce_any(equal, 1)
         tr = tf.fill((self.batch_size, 1), 1.0)
-        return sparse_entrophy(y_true, y_pred) + self.key_weight * cross_entropy(f, tr)
+        true_octave = tf.fill((self.batch_size, 1), (tf.math.floordiv(y_true[self.batch_size-1], 12)) -1)
+        pred_octave = tf.math.floordiv(index, 12)
+        return sparse_entrophy(y_true, y_pred) + self.key_weight * cross_entropy(f, tr) + sparse_entrophy(y_true, y_pred)

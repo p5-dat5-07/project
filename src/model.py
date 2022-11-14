@@ -7,6 +7,7 @@ import pathlib
 import collections
 import json
 import os
+from tensorflow.keras.layers import GRU, Dense, Dropout, LSTM, Bidirectional
 from callback import Callback
 from dataclasses import dataclass, asdict
 from consts import *
@@ -76,7 +77,7 @@ class Model:
         self.file_names     = self.files[self.params.files_offset:self.params.files_offset+self.params.file_count]
         self.key_order      = ["pitch", "step", "duration"]
     def load(self, model_name):
-        self.model = tf.keras.models.load_model(f"./{model_name}/{model_name}.h5")
+        self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
     def summary(self):
         print(self.params.summary())
         self.model.summary()
@@ -85,33 +86,33 @@ class Model:
         input_shape = (self.params.sequence_length, 3)  
         input_layer = tf.keras.Input(input_shape)
 
-        x = tf.keras.layers.GRU(256, return_sequences=True)(input_layer)
-        d1 = tf.keras.layers.Dropout(0.3)(x)
+        x = Bidirectional(GRU(256, return_sequences=True))(input_layer)
+        d1 = Dropout(0.3)(x)
 
-        ph1 = tf.keras.layers.GRU(128, name="pitch_hidden1")(d1)
-        sh1 = tf.keras.layers.GRU(128, name="step_hidden1")(d1)
-        dh1 = tf.keras.layers.GRU(128, name="duration_hidden1")(d1)
+        ph1 = Bidirectional(GRU(128, name="pitch_hidden1"))(d1)
+        sh1 = Bidirectional(GRU(128, name="step_hidden1"))(d1)
+        dh1 = Bidirectional(GRU(128, name="duration_hidden1"))(d1)
 
-        d2 = tf.keras.layers.Dropout(0.3)(ph1)
-        d3 = tf.keras.layers.Dropout(0.3)(sh1)
-        d4 = tf.keras.layers.Dropout(0.3)(dh1)
+        d2 = Dropout(0.3)(ph1)
+        d3 = Dropout(0.3)(sh1)
+        d4 = Dropout(0.3)(dh1)
 
-        ph2 = tf.keras.layers.Dense(128,  activation="sigmoid", name="pitch_hidden2")(d2)
-        sh2 = tf.keras.layers.Dense(30,   activation="relu", name="step_hidden2")(d3)
-        dh2 = tf.keras.layers.Dense(30,   activation="relu", name="duration_hidden2")(d4)
+        ph2 = Dense(128,  activation="sigmoid", name="pitch_hidden2")(d2)
+        sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
+        dh2 = Dense(30,   activation="relu", name="duration_hidden2")(d4)
 
-        d5 = tf.keras.layers.Dropout(0.3)(ph2)
-        d6 = tf.keras.layers.Dropout(0.3)(sh2)
-        d7 = tf.keras.layers.Dropout(0.3)(dh2)
+        d5 = Dropout(0.3)(ph2)
+        d6 = Dropout(0.3)(sh2)
+        d7 = Dropout(0.3)(dh2)
 
         output_layers = {
-            "pitch": tf.keras.layers.Dense(128, name="pitch")(d5),
-            "step": tf.keras.layers.Dense(1,  activation="relu", name="step")(d6),
-            "duration": tf.keras.layers.Dense(1, activation="relu", name="duration")(d7),
+            "pitch": Dense(128, name="pitch")(d5),
+            "step": Dense(1,  activation="relu", name="step")(d6),
+            "duration": Dense(1, activation="relu", name="duration")(d7),
         }
         self.model = tf.keras.Model(input_layer, output_layers)
 
-    def train_model(self, model_name: str, callback: Callback) -> tf.data.Dataset:
+    def train_model(self, model_name: str, save: bool, callback: Callback) -> tf.data.Dataset:
         data = None
         data_length = 0
         # Get data
@@ -137,24 +138,28 @@ class Model:
         if self.params.sample_location + self.params.samples_per_epoch > len(self.files):
             print(f"Sample location ({self.params.sample_location}) + samples per epoch ({self.params.samples_per_epoch}) has to be lower than the total amount of files ({len(self.files)})!")
             exit()
+        
+        if save:
+            if not os.path.exists("./models"):
+                os.mkdir("./models")
 
-        if os.path.exists(f"./{model_name}"):
-            print(f"Model with the name {model_name} already exists!")
-            exit()
+            if os.path.exists(f"./models/{model_name}"):
+                print(f"Model with the name {model_name} already exists!")
+                exit()
 
+            os.mkdir(f"./models/{model_name}")
         # Train on data
-        os.mkdir(f"./{model_name}")
-        for epoch in range(self.params.epochs):
+        for epoch in range(1, self.params.epochs+1):
             print("epoch:", epoch)
             self.train(training_data, callback)
-            if epoch % (self.params.epochs_between_samples-1) == 0 and epoch > 0:
-                os.mkdir(f"./{model_name}/epoch{epoch}")
-                for i in range(0, self.params.samples_per_epoch):
-                    print(f"generating sample: {i+1}")
-                    self.generate_notes(self.files[self.params.sample_location+i], f"./{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
+            if save and epoch % (self.params.epochs_between_samples) == 0 and epoch > 0:
+                os.mkdir(f"./models/{model_name}/epoch{epoch}")
+                for i in range(1, self.params.samples_per_epoch+1):
+                    print(f"generating sample: {i}")
+                    self.generate_notes(self.files[self.params.sample_location+i], f"./models/{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
         
-        self.model.save( f"./{model_name}/{model_name}.h5")
-        with open( f"./{model_name}/{model_name}.json", "w") as f:
+        self.model.save( f"./models/{model_name}/{model_name}.h5")
+        with open( f"./models/{model_name}/{model_name}.json", "w") as f:
             f.write(json.dumps(self.params.to_dict()))
     @tf.function
     def train_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
@@ -208,6 +213,8 @@ class Model:
             inputs = sequences[:-1]
             labels_dense = sequences[-1]
             labels = {key:labels_dense[i] for i,key in enumerate(self.key_order)}
+            labels['step'] += [0.001]
+            labels['duration'] += [0.001]
             return scale_pitch(inputs), labels, self.get_key_in_filename(file_path)
         
         return sequences.map(split_labels)

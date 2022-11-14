@@ -20,7 +20,7 @@ def main():
         model.data_dir = mode.data
         model.create_model()
         model.summary()
-        model.train_model(mode.name, callback = Cb1())
+        model.train_model(mode.name, mode.save, callback = Cb1())
     elif type(mode) is Generate:
         mode: Generate = mode
         model.load(mode.name)

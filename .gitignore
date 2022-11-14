@@ -2,3 +2,4 @@ data
 *.mid
 training_checkpoints
 __pycache__
+models

@@ -16,6 +16,7 @@ class Generate(Base):
 class Train(Base):
     name: str = "model"                     # The name of the model.
     data: str = "./data/q-maestro-v2.0.0"   # The path to the data directory.
+    save: bool = True                       # Wether to save the model
 
 @dataclass
 class Mode:
