@@ -13,8 +13,7 @@ from dataclasses import dataclass, asdict
 from consts import *
 from data_manager import DataManager
 from args import Params, Train
-#(16 * 120 / 60)
-
+from util import midi_to_notes, notes_to_midi
 
 class Model:
     params:         Params
@@ -75,7 +74,7 @@ class Model:
         }
         self.model = tf.keras.Model(input_layer, output_layers)
 
-    def train_model(self, model_name: str, save: bool, callback: Callback) -> tf.data.Dataset:
+    def train_model(self, model_name: str, sample_dir: str, save: bool, callback: Callback) -> tf.data.Dataset:
         if save:
             if not os.path.exists("./models"):
                 os.mkdir("./models")
@@ -83,6 +82,9 @@ class Model:
             if os.path.exists(f"./models/{model_name}"):
                 print(f"Model with the name {model_name} already exists!")
                 exit()
+            
+            os.mkdir(f"./models/{model_name}")
+            self.files = glob.glob(str(pathlib.Path(sample_dir)/"**/*.mid*"))
         # Train on data
         for epoch in range(1, self.params.epochs+1):
             print("epoch:", epoch)
@@ -131,13 +133,11 @@ class Model:
         instrument = pretty_midi.PrettyMIDI(in_file).instruments[0]
         instrument_name = pretty_midi.program_to_instrument_name(instrument.program)
 
-        raw_notes = self.dm.midi_to_notes(in_file)
+        raw_notes = midi_to_notes(in_file, self.params.steps_per_second)
         generated_notes = {
             "pitch": [],
             "step":  [],
             "duration": [],
-            "start": [],
-            "end":  []
         }
 
         sample_notes = np.stack([raw_notes[key] for key in self.key_order], axis=1)
@@ -158,13 +158,11 @@ class Model:
             generated_notes["pitch"].append(pitch)
             generated_notes["step"].append(step)
             generated_notes["duration"].append(duration)
-            generated_notes["start"].append(start)
-            generated_notes["end"].append(end)
 
             input_notes = np.delete(input_notes, 0, axis=0)
             input_notes = np.append(input_notes, np.expand_dims(tf.divide(input_note, [128, 1, 1]), 0), axis=0)
             prev_start = start
-        pm = self.notes_to_midi(pd.DataFrame(generated_notes, columns=(*(self.key_order), "start", "end")), instrument_name)
+        pm = notes_to_midi(pd.DataFrame(generated_notes, columns=(*(self.key_order), "start", "end")), instrument_name, self.params.steps_per_second)
         pm.write(out_file)
 
     def predict_next_note(
@@ -196,29 +194,5 @@ class Model:
 
         return int(pitch), float(step), float(duration)
     
-    def notes_to_midi(self,
-        notes: pd.DataFrame,
-        instrument_name: str,
-        velocity: int = 100,  # note loudness
-        ) -> pretty_midi.PrettyMIDI:
-        pm = pretty_midi.PrettyMIDI()
-        instrument = pretty_midi.Instrument(
-            program=pretty_midi.instrument_name_to_program(
-                instrument_name))
 
-        prev_start = 0
-        for i, note in notes.iterrows():
-            start = float(prev_start + (note["step"]  / self.params.steps_per_seconds))
-            end = float(start + (note["duration"] / self.params.steps_per_seconds))
-            note = pretty_midi.Note(
-                velocity=velocity,
-                pitch=int(note["pitch"]),
-                start=start,
-                end=end,
-            )
-            instrument.notes.append(note)
-            prev_start = start
-
-        pm.instruments.append(instrument)
-        return pm
     

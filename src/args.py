@@ -21,9 +21,10 @@ class Data(Base):
 
 @dataclass
 class Train(Base):
-    name: str = "model"                     # The name of the model.
-    data: str = "./datasets/maestro_10"     # The path to the data directory.
-    save: bool = True                       # Wether to save the model
+    name: str = "model"                         # The name of the model.
+    data: str = "./datasets/maestro_10"         # The path to the data directory.
+    sample_dir: str = "./data/q-maestro-v2.0.0" # The sample director to get the sample midi sequence(s) from.
+    save: bool = True                           # Wether to save the model
 
 @dataclass
 class Mode:
@@ -47,7 +48,7 @@ class Params:
     sample_location:        int   = 505     # The file to start from in the dataset when generating samples.
     notes_per_sample:       int   = 200     # The amount of notes to generate per sample.
     sample_temprature:      int   = 2       # The temprature of the samples.
-    steps_per_seconds:      int   = 1       # The amount of steps per second.
+    steps_per_second:      int   = 1       # The amount of steps per second.
     normalization:          int   = 0.25    # The normalization value for the gradient.
 
     def summary(self) -> str:

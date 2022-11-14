@@ -1,6 +1,4 @@
-import pandas as pd
 import numpy as np
-import pretty_midi
 import glob
 import pathlib
 import collections
@@ -8,6 +6,7 @@ import json
 import os
 from consts import *
 from args import Data, Params
+from util import midi_to_notes
 
 class DataManager:
     file_names:     [str]
@@ -32,7 +31,7 @@ class DataManager:
         offset = self.settings.offset
         file_count = self.settings.amount
         for file in self.file_names:
-            notes = self.midi_to_notes(file)
+            notes = midi_to_notes(file, self.params.steps_per_second)
             train_notes = np.stack([notes[key] for key in self.key_order], axis=1)
             data_length += len(train_notes)
             notes_dataset = tf.data.Dataset.from_tensor_slices(train_notes)
@@ -77,26 +76,6 @@ class DataManager:
             return scale_pitch(inputs), labels, self.get_key_in_filename(file_path)
         
         return sequences.map(split_labels)
-
-
-    def midi_to_notes(self, file: str) -> pd.DataFrame:
-        pm = pretty_midi.PrettyMIDI(file)
-        instrument = pm.instruments[0]
-        notes = collections.defaultdict(list)
-        # Sort the notes by start time
-        sorted_notes = sorted(instrument.notes, key=lambda note: note.start)
-        prev_start = sorted_notes[0].start
-
-        for note in sorted_notes:
-            start = note.start
-            end = note.end
-            notes["pitch"].append(note.pitch)
-            notes["step"].append((start - prev_start) * self.params.steps_per_seconds)
-            notes["duration"].append((end - start) * self.params.steps_per_seconds)
-            prev_start = start
-
-        return pd.DataFrame({name: np.array(value) for name, value in notes.items()})
-
 
     def get_key_in_filename(self, file_path: str):
         with open("./keys.json") as file:
