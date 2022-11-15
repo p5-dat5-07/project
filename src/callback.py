@@ -1,8 +1,8 @@
 import tensorflow as tf
 
 class Callback():
-    def __call__(self, i, pitch, step, duration):
-        self.call(i, pitch, step, duration)
+    def __call__(self, *args, **kwargs):
+        self.call(*args, **kwargs)
 
 class Cb1(Callback):
     all_pitch_loss:     tf.float32
@@ -15,7 +15,7 @@ class Cb1(Callback):
         self.all_duration_loss = 0.0
         self.start = tf.cast(0.0, dtype=tf.float64)
 
-    def call(self, i, pitch, step, duration):
+    def call(self, i, pitch, step, duration, *kwargs):
         if i == 0:
             self.all_pitch_loss = 0.0
             self.all_step_loss = 0.0

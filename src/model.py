@@ -14,7 +14,7 @@ from consts import *
 @dataclass
 class Params:
     """ Parameters for ajusting the model """
-    epochs:                 int   = 50      # The amount of Epochs.
+    epochs:                 int   = 5      # The amount of Epochs.
     sequence_length:        int   = 64      # The amount of notes per sequence.
     batch_size:             int   = 50      # The batch size.
     learning_rate:          float = 0.001   # The learning rate.
@@ -62,8 +62,8 @@ class Model:
     step_loss:      Loss
     duration_loss:  Loss
     optimizer:      Optimizer
-    file_names:     [str]
-    key_order:      [str]
+    file_names:     str
+    key_order:      str
 
     def __init__(self, params: Params, pitch_loss: Loss, step_loss: Loss, duration_loss: Loss,
                     optimizer: Optimizer, data_directory = "data/q-maestro-v2.0.0"):
@@ -75,6 +75,7 @@ class Model:
         self.files          = glob.glob(str(pathlib.Path(data_directory)/"**/*.mid*"))
         self.file_names     = self.files[self.params.files_offset:self.params.files_offset+self.params.file_count]
         self.key_order      = ["pitch", "step", "duration"]
+        self.loss_per_epoch = {}
     def load(self, model_name):
         self.model = tf.keras.models.load_model(f"./{model_name}/{model_name}.h5")
     def summary(self):
@@ -146,7 +147,8 @@ class Model:
         os.mkdir(f"./{model_name}")
         for epoch in range(self.params.epochs):
             print("epoch:", epoch)
-            self.train(training_data, callback)
+            current_loss = self.train(training_data, callback)
+            self.loss_per_epoch['epoch ' + str(epoch)] = {'pitch': float(current_loss['pitch'].numpy()), 'duration': float(current_loss['duration'].numpy()), 'step': float(current_loss['step'].numpy())}
             if epoch % (self.params.epochs_between_samples-1) == 0 and epoch > 0:
                 os.mkdir(f"./{model_name}/epoch{epoch}")
                 for i in range(0, self.params.samples_per_epoch):
@@ -154,8 +156,13 @@ class Model:
                     self.generate_notes(self.files[self.params.sample_location+i], f"./{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
         
         self.model.save( f"./{model_name}/{model_name}.h5")
+        jd = {
+            'Hyperparameters' : self.params.to_dict(), 
+            'Loss' : self.loss_per_epoch
+        }
         with open( f"./{model_name}/{model_name}.json", "w") as f:
-            f.write(json.dumps(self.params.to_dict()))
+            f.write(json.dumps(jd, indent=2))
+
     @tf.function
     def train_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
         with tf.GradientTape() as tape:
@@ -182,11 +189,16 @@ class Model:
         return (pitch_loss, step_loss, duration_loss)
 
     def train(self, training_data: tf.data.Dataset, callback: Callback):
+        step = 0
         for step, (x_batch_train, y_batch_train, keys) in enumerate(training_data):
+            step = step
             (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
             callback(step, pitch_loss, step_loss, duration_loss)
 
-    def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> [tf.data.Dataset]:
+        return {'pitch': callback.all_pitch_loss / (step + 1), 'duration': callback.all_duration_loss / (step + 1), 'step': callback.all_step_loss / (step + 1)}
+        
+
+    def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> tf.data.Dataset:
         """Returns TF Dataset of sequence and label examples."""
         sequence_length = self.params.sequence_length+1
 

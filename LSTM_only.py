@@ -288,7 +288,7 @@ def train(model, train_ds):
         "Training loss (avg) at step ", step, " - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
   
   step = tf.cast(step, dtype=tf.float32)
-  return {'pitch': all_pitch_loss / (step + 1), 'dration': all_duration_loss / (step + 1), 'step': all_step_loss / (step + 1)}
+  return {'pitch': all_pitch_loss / (step + 1), 'duration': all_duration_loss / (step + 1), 'step': all_step_loss / (step + 1)}
 
 
 
@@ -360,7 +360,7 @@ def create_sequences(
   def scale_pitch(x):
     x = x/[vocab_size,1.0,1.0] - [0, 0.5, 0.5]
     return x
-
+  
   def normalize(x):
     x['step'] = x['step'] - [0.5]
     x['duration'] = x['duration'] - [0.5]
@@ -372,7 +372,7 @@ def create_sequences(
     labels_dense = sequences[-1]
     labels = {key:labels_dense[i] for i,key in enumerate(key_order)}
 
-    return scale_pitch(inputs), normalize(labels), get_key_in_filename(filepath)
+    return scale_pitch(inputs), normalize(labels), get_key_in_filename(filepath) 
   
   return sequences.map(split_labels)
 
