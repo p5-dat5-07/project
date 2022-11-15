@@ -24,10 +24,6 @@ class DataManager:
     def generate_dataset(self):
         data = None
         data_length = 0
-        # Get data
-        if self.params.sample_location + self.params.samples_per_epoch > len(self.files):
-            print(f"Sample location ({self.params.sample_location}) + samples per epoch ({self.params.samples_per_epoch}) has to be lower than the total amount of files ({len(self.files)})!")
-            exit()
         offset = self.settings.offset
         file_count = self.settings.amount
         for file in self.file_names:
@@ -46,8 +42,14 @@ class DataManager:
                             .batch(self.params.batch_size, drop_remainder=True)
                             .cache()
                             .prefetch(tf.data.experimental.AUTOTUNE))
+        if not os.path.exists("./datasets"):
+            os.mkdir("./datasets")
+        path = f"./datasets/{self.settings.name}"
+        training_data.save(f"./datasets/{self.settings.name}")
         
-        training_data.save(self.settings.output)
+        with open( f"{path}/settings.json", "w") as f:
+            f.write(json.dumps({"offset": self.settings.offset, "amount": self.settings.amount, "dataset_path": self.settings.input, "total_file_count": len(self.files)}))
+
 
     def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> [tf.data.Dataset]:
         """Returns TF Dataset of sequence and label examples."""

@@ -1,4 +1,5 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import glob
 import pathlib
 from consts import *
@@ -7,6 +8,7 @@ from callback import Cb1
 from loss import MusicLoss
 from args import parser, Train, Generate, Data, Base
 from data_manager import DataManager
+
 
 def main():
     args = parser.parse_args()
@@ -20,7 +22,7 @@ def main():
         mode: Train = mode
         model.create_model()
         model.summary()
-        model.load_dataset(mode.data)
+        model.load_dataset(mode.data, mode.sample_dir)
         model.train_model(mode.name, mode.sample_dir, mode.save, callback = Cb1())
     elif type(mode) is Data: 
         mode: Data = mode

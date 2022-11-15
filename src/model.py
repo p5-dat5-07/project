@@ -35,8 +35,19 @@ class Model:
     def load(self, model_name):
         self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
     
-    def load_dataset(self, data_path: str):
+    def load_dataset(self, data_path: str, sample_dir: str):
         self.training_data = tf.data.Dataset.load(data_path)
+        with open(f"{data_path}/settings.json", "r") as f:
+            settings = json.load(f)
+            if sample_dir == settings['dataset_path']:
+                if self.params.sample_location + self.params.samples_per_epoch > settings['total_file_count']:
+                    print(f"Sample location ({self.params.sample_location}) + samples per epoch ({self.params.samples_per_epoch}) has to be lower than the total amount of files ({settings['total_file_count']})!")
+                    exit()
+                elif max(0, min(self.params.samples_per_epoch+self.params.sample_location, settings["amount"]+settings["offset"]) - max(self.params.sample_location, settings["offset"])+1):
+                    print(f"Sample area overlaps with training data!")
+                    print(f"\tSample area: {self.params.sample_location}-{self.params.sample_location +  self.params.samples_per_epoch}")
+                    print(f"\tTraining area: {settings['offset']}-{settings['offset'] +  settings['amount']}")
+                    exit()
 
     def summary(self):
         print(self.params.summary())
@@ -46,18 +57,18 @@ class Model:
         input_shape = (self.params.sequence_length, 3)  
         input_layer = tf.keras.Input(input_shape)
 
-        x = Bidirectional(GRU(256, return_sequences=True))(input_layer)
+        x = Bidirectional(LSTM(256, return_sequences=True))(input_layer)
         d1 = Dropout(0.3)(x)
 
-        ph1 = Bidirectional(GRU(128, name="pitch_hidden1"))(d1)
-        sh1 = Bidirectional(GRU(128, name="step_hidden1"))(d1)
-        dh1 = Bidirectional(GRU(128, name="duration_hidden1"))(d1)
+        ph1 = Bidirectional(LSTM(128, name="pitch_hidden1"))(d1)
+        sh1 = Bidirectional(LSTM(128, name="step_hidden1"))(d1)
+        dh1 = Bidirectional(LSTM(128, name="duration_hidden1"))(d1)
 
         d2 = Dropout(0.3)(ph1)
         d3 = Dropout(0.3)(sh1)
         d4 = Dropout(0.3)(dh1)
 
-        ph2 = Dense(128,  activation="sigmoid", name="pitch_hidden2")(d2)
+        ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
         sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
         dh2 = Dense(30,   activation="relu", name="duration_hidden2")(d4)
 

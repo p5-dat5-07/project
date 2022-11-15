@@ -14,7 +14,7 @@ class Generate(Base):
 
 @dataclass
 class Data(Base):
-    output: str                             # The output directory or file to write the midi sequence(s) to.
+    name: str                               # The name of the dataset.
     input:  str = "./data/q-maestro-v2.0.0" # The input directory or file to get the initial midi sequence(s) from.
     amount: int = 10                        # The amount of files to add to the dataset.
     offset: int = 0                         # The starting point in the dataset
