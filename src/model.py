@@ -7,6 +7,7 @@ import pathlib
 import json
 import os
 from tensorflow.keras.layers import GRU, Dense, Dropout, LSTM, Bidirectional
+import tensorflow_datasets as tfds
 from callback import Callback
 from consts import *
 from data_manager import DataManager
@@ -22,6 +23,7 @@ class Model:
     optimizer:      Optimizer
     key_order:      [str]
     training_data:  tf.data.Dataset
+    test_data:      tf.data.Dataset
 
     def __init__(self, params: Params, pitch_loss: Loss, step_loss: Loss, duration_loss: Loss,
                     optimizer: Optimizer):
@@ -36,7 +38,10 @@ class Model:
         self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
     
     def load_dataset(self, data_path: str, sample_dir: str):
-        self.training_data = tf.data.Dataset.load(data_path)
+        full_dataset = tf.data.Dataset.load(data_path)
+        self.training_data = full_dataset.take(full_dataset.cardinality().numpy()/4*3)
+        self.test_data = full_dataset.skip(full_dataset.cardinality().numpy()/4*3)
+
         with open(f"{data_path}/settings.json", "r") as f:
             settings = json.load(f)
             if sample_dir == settings['dataset_path']:
@@ -98,6 +103,11 @@ class Model:
         for epoch in range(1, self.params.epochs+1):
             print("epoch:", epoch)
             self.train(self.training_data, callback)
+            self.test(self.test_data, callback)
+            
+            print(callback.test_list)
+            print(callback.train_list)
+
             if save and epoch % (self.params.epochs_between_samples) == 0 and epoch > 0:
                 os.mkdir(f"./models/{model_name}/epoch{epoch}")
                 for i in range(1, self.params.samples_per_epoch+1):
@@ -133,10 +143,26 @@ class Model:
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
         return (pitch_loss, step_loss, duration_loss)
 
+    @tf.function
+    def test_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
+        logits = self.model(x_batch_train, training=True)  # Logits for this minibatch
+    
+        # Compute the loss value for this minibatch.
+        pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
+        step_loss = self.step_loss(y_batch_train["step"], logits["step"]) * self.params.step_loss_scaler
+        duration_loss = self.duration_loss(y_batch_train["duration"], logits["duration"]) * self.params.duration_loss_scaler
+
+        return (pitch_loss, step_loss, duration_loss)
+
     def train(self, training_data: tf.data.Dataset, callback: Callback):
         for step, (x_batch_train, y_batch_train, keys) in enumerate(training_data):
             (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
-            callback(step, pitch_loss, step_loss, duration_loss)
+            callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='train')
+
+    def test(self, test_data: tf.data.Dataset, callback: Callback):
+        for step, (x_batch_train, y_batch_train, keys) in enumerate(test_data):
+            (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
+            callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='test')
 
     def generate_notes(self, in_file: str, out_file: str):
         instrument = pretty_midi.PrettyMIDI(in_file).instruments[0]
