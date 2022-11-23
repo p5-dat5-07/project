@@ -1,5 +1,6 @@
 data
 *.mid
+*.midi
 training_checkpoints
 __pycache__
 models

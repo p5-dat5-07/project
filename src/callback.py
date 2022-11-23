@@ -27,7 +27,6 @@ class Cb1(Callback):
 
     def call(self, i, pitch, step, duration, mode, max_step, **kwargs):
         if (mode == 'test'):
-
             if i == max_step:
                 self.test_list[0].append((self.test_pitch_loss.numpy() + self.test_step_loss.numpy() + self.test_duration_loss.numpy()) / max_step)
                 self.test_list[1].append(self.test_pitch_loss.numpy() / max_step)

@@ -33,7 +33,7 @@ class Model:
         self.duration_loss  = duration_loss
         self.optimizer      = optimizer
         self.key_order      = ["pitch", "step", "duration"]
-        
+
     def load(self, model_name):
         self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
     
