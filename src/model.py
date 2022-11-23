@@ -88,16 +88,16 @@ class Model:
         }
         self.model = tf.keras.Model(input_layer, output_layers)
 
-    def train_model(self, model_name: str, sample_dir: str, save: bool, callback: Callback) -> tf.data.Dataset:
+    def train_model(self, model_name: str, model_dir: str, sample_dir: str, save: bool, callback: Callback) -> tf.data.Dataset:
         if save:
-            if not os.path.exists("./models"):
-                os.mkdir("./models")
+            if not os.path.exists(model_dir):
+                os.mkdir(model_dir)
 
-            if os.path.exists(f"./models/{model_name}"):
+            if os.path.exists(f"{model_dir}/{model_name}"):
                 print(f"Model with the name {model_name} already exists!")
                 exit()
             
-            os.mkdir(f"./models/{model_name}")
+            os.mkdir(f"{model_dir}/{model_name}")
             self.files = glob.glob(str(pathlib.Path(sample_dir)/"**/*.mid*"))
         # Train on data
         for epoch in range(1, self.params.epochs+1):
@@ -106,12 +106,12 @@ class Model:
             self.test(self.test_data, callback)
 
             if save and epoch % (self.params.epochs_between_samples) == 0 and epoch > 0:
-                os.mkdir(f"./models/{model_name}/epoch{epoch}")
+                os.mkdir(f"{model_dir}/{model_name}/epoch{epoch}")
                 for i in range(1, self.params.samples_per_epoch+1):
                     print(f"generating sample: {i}")
-                    self.generate_notes(self.files[self.params.sample_location+i], f"./models/{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
+                    self.generate_notes(self.files[self.params.sample_location+i], f"{model_dir}/{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
         
-        self.model.save( f"./models/{model_name}/{model_name}.h5")
+        self.model.save( f"{model_dir}/{model_name}/{model_name}.h5")
         jf_dict = {
             'hyperparameters': self.params.to_dict(),
             'training_loss': {
@@ -127,7 +127,7 @@ class Model:
                 'duration': callback.test_list[3],
             },
         }
-        with open( f"./models/{model_name}/{model_name}.json", "w") as f:
+        with open( f"{model_dir}/{model_name}/{model_name}.json", "w") as f:
             f.write(json.dumps(jf_dict, indent=4))
     
     @tf.function
@@ -175,7 +175,7 @@ class Model:
     def test(self, test_data: tf.data.Dataset, callback: Callback):
         max_step = len(list(test_data)) - 1
         for step, (x_batch_train, y_batch_train, keys) in enumerate(test_data):
-            (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
+            (pitch_loss, step_loss, duration_loss) = self.test_step(x_batch_train, y_batch_train, keys)
             callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='test', max_step=max_step)
 
     def generate_notes(self, in_file: str, out_file: str):
