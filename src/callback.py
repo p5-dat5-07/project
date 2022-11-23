@@ -1,8 +1,8 @@
 import tensorflow as tf
 
 class Callback():
-    def __call__(self, i, pitch, step, duration, mode, max_step):
-        self.call(i, pitch, step, duration, mode, max_step)
+    def __call__(self, *args, **kwargs):
+        self.call(*args, **kwargs)
 
 class Cb1(Callback):
     all_pitch_loss:     tf.float32
@@ -25,7 +25,7 @@ class Cb1(Callback):
         self.test_list = [[],[],[],[]]
         self.train_list = [[],[],[],[]]
 
-    def call(self, i, pitch, step, duration, mode, max_step):
+    def call(self, i, pitch, step, duration, mode, max_step, **kwargs):
         if (mode == 'test'):
 
             if i == max_step:
