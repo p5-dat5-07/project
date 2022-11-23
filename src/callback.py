@@ -22,17 +22,17 @@ class Cb1(Callback):
         self.test_step_loss = 0.0
         self.test_duration_loss = 0.0
         self.start = tf.cast(0.0, dtype=tf.float64)
-        self.test_list = []
-        self.train_list = []
+        self.test_list = [[],[],[],[]]
+        self.train_list = [[],[],[],[]]
 
     def call(self, i, pitch, step, duration, mode, max_step):
         if (mode == 'test'):
 
             if i == max_step:
-                self.test_list.append({ 'loss': (self.test_pitch_loss.numpy() + self.test_step_loss.numpy() + self.test_duration_loss.numpy()) / max_step,
-                                        'pitch': self.test_pitch_loss.numpy() / i,
-                                        'step': self.test_step_loss.numpy() / i,
-                                        'duration': self.test_duration_loss.numpy() / i})
+                self.test_list[0].append((self.test_pitch_loss.numpy() + self.test_step_loss.numpy() + self.test_duration_loss.numpy()) / max_step)
+                self.test_list[1].append(self.test_pitch_loss.numpy() / max_step)
+                self.test_list[2].append(self.test_step_loss.numpy() / max_step)
+                self.test_list[3].append(self.test_duration_loss.numpy() / max_step)
             elif i == 0:
                 self.test_pitch_loss = 0.0
                 self.test_step_loss = 0.0
@@ -53,10 +53,10 @@ class Cb1(Callback):
                 self.start = tf.timestamp()
         elif (mode == 'train'):
             if i == max_step:
-                self.train_list.append({ 'loss': (self.all_pitch_loss.numpy() + self.all_step_loss.numpy() + self.all_duration_loss.numpy()) / i,
-                                        'pitch': self.all_pitch_loss.numpy() / i,
-                                        'step': self.all_step_loss.numpy() / i,
-                                        'duration': self.all_duration_loss.numpy() / i})
+                self.train_list[0].append((self.all_pitch_loss.numpy() + self.all_step_loss.numpy() + self.all_duration_loss.numpy()) / max_step)
+                self.train_list[1].append(self.all_pitch_loss.numpy() / max_step)
+                self.train_list[2].append(self.all_step_loss.numpy() / max_step)
+                self.train_list[3].append(self.all_duration_loss.numpy() / max_step)
             elif i == 0:
                 self.all_pitch_loss = 0.0
                 self.all_step_loss = 0.0

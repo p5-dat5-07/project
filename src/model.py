@@ -114,8 +114,18 @@ class Model:
         self.model.save( f"./models/{model_name}/{model_name}.h5")
         jf_dict = {
             'hyperparameters': self.params.to_dict(),
-            'training_loss': {'epoch' + str(i): dict(map(lambda item: (item[0], float(item[1])), x.items())) for i, x in enumerate(callback.train_list)},
-            'test_loss': {'epoch' + str(i): dict(map(lambda item: (item[0], float(item[1])), x.items())) for i, x in enumerate(callback.test_list)},
+            'training_loss': {
+                'loss': callback.train_list[0],
+                'pitch': callback.train_list[1],
+                'step': callback.train_list[2],
+                'duration': callback.train_list[3],
+            },
+            'test_loss': {
+                'loss': callback.test_list[0],
+                'pitch': callback.test_list[1],
+                'step': callback.test_list[2],
+                'duration': callback.test_list[3],
+            },
         }
         with open( f"./models/{model_name}/{model_name}.json", "w") as f:
             f.write(json.dumps(jf_dict, indent=4))

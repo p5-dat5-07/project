@@ -14,17 +14,21 @@ class Generate(Base):
 
 @dataclass
 class Data(Base):
-    name: str                               # The name of the dataset.
-    input:  str = "./data/q-maestro-v2.0.0" # The input directory or file to get the initial midi sequence(s) from.
-    amount: int = 10                        # The amount of files to add to the dataset.
-    offset: int = 0                         # The starting point in the dataset
+    name:           str                             # The name of the dataset.
+    dataset_dir:    str = "./datasets/"             # The directory to store datasets.
+    input:          str = "./data/q-maestro-v2.0.0" # The input directory or file to get the initial midi sequence(s) from.
+    amount:         int = 10                        # The amount of files to add to the dataset.
+    offset:         int = 0                         # The starting point in the dataset
+    nudge_step:     float = 0.01                    # The value added to step to prevent it from getting to close to zero
+    nudge_duration: float = 0.01                    # The value added to duration to prevent it from getting to close to zero
 
 @dataclass
 class Train(Base):
-    name: str = "model"                         # The name of the model.
-    data: str = "./datasets/maestro_10"         # The path to the data directory.
-    sample_dir: str = "./data/q-maestro-v2.0.0" # The sample director to get the sample midi sequence(s) from.
-    save: bool = True                           # Wether to save the model
+    name:       str     = "model"                       # The name of the model.
+    model_dir:  str     = "./models"                    # The directory containing the models
+    data:       str     = "./datasets/maestro_10"       # The path to the data directory.
+    sample_dir: str     = "./data/q-maestro-v2.0.0"     # The sample director to get the sample midi sequence(s) from.
+    save:       bool    = True                          # Wether to save the model
 
 @dataclass
 class Mode:
@@ -35,7 +39,7 @@ class Mode:
 @dataclass
 class Params:
     """ Parameters for ajusting the model """
-    epochs:                 int   = 2      # The amount of Epochs.
+    epochs:                 int   = 50      # The amount of Epochs.
     sequence_length:        int   = 64      # The amount of notes per sequence.
     batch_size:             int   = 50      # The batch size.
     learning_rate:          float = 0.001   # The learning rate.
@@ -48,7 +52,7 @@ class Params:
     sample_location:        int   = 505     # The file to start from in the dataset when generating samples.
     notes_per_sample:       int   = 200     # The amount of notes to generate per sample.
     sample_temprature:      int   = 2       # The temprature of the samples.
-    steps_per_second:      int   = 1       # The amount of steps per second.
+    steps_per_second:       int   = 1       # The amount of steps per second.
     normalization:          int   = 0.25    # The normalization value for the gradient.
 
     def summary(self) -> str:

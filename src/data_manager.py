@@ -14,7 +14,7 @@ class DataManager:
     settings:       Data
     params:         Params
 
-    def __init__(self, params, settings):
+    def __init__(self, params: Params, settings: Data):
         self.params         = params
         self.settings       = settings
         self.files          = glob.glob(str(pathlib.Path(self.settings.input)/"**/*.mid*"))
@@ -42,13 +42,20 @@ class DataManager:
                             .batch(self.params.batch_size, drop_remainder=True)
                             .cache()
                             .prefetch(tf.data.experimental.AUTOTUNE))
-        if not os.path.exists("./datasets"):
-            os.mkdir("./datasets")
-        path = f"./datasets/{self.settings.name}"
-        training_data.save(f"./datasets/{self.settings.name}")
+        if not os.path.exists(self.settings.dataset_dir):
+            os.mkdir(self.settings.dataset_dir)
+        path = f"{self.settings.dataset_dir}{self.settings.name}"
+        training_data.save(f"{self.settings.dataset_dir}{self.settings.name}")
         
         with open( f"{path}/settings.json", "w") as f:
-            f.write(json.dumps({"offset": self.settings.offset, "amount": self.settings.amount, "dataset_path": self.settings.input, "total_file_count": len(self.files)}))
+            f.write(json.dumps({
+                "nudge_step":       self.settings.nudge_step,
+                "nudge_duration":   self.settings.nudge_duration,
+                "offset":           self.settings.offset,
+                "amount":           self.settings.amount,
+                "dataset_path":     self.settings.input,
+                "total_file_count": len(self.files)
+            }))
 
 
     def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> [tf.data.Dataset]:
@@ -73,8 +80,8 @@ class DataManager:
             inputs = sequences[:-1]
             labels_dense = sequences[-1]
             labels = {key:labels_dense[i] for i,key in enumerate(self.key_order)}
-            labels['step'] += [0.001]
-            labels['duration'] += [0.001]
+            labels['step'] += [self.settings.nudge_step]
+            labels['duration'] += [self.settings.nudge_duration]
             return scale_pitch(inputs), labels, self.get_key_in_filename(file_path)
         
         return sequences.map(split_labels)
