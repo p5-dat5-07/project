@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import json
 from dataclasses import dataclass, asdict
 from simple_parsing import ArgumentParser
@@ -7,11 +8,11 @@ def fix_json(file: str):
     res = {}
     with open(file) as f:
         data = json.load(f)
-        data['training_loss'] = convert(data, 'training_loss')
-        data['test_loss'] = convert(data, 'test_loss')
+        data["training_loss"] = convert(data, "training_loss")
+        data["test_loss"] = convert(data, "test_loss")
         res = data
 
-    with open(file, 'w') as f:
+    with open(file, "w") as f:
         f.write(json.dumps(res))
 
 def convert(data: dict, t: str):
@@ -20,10 +21,10 @@ def convert(data: dict, t: str):
     duration = []
     step = []
     for epoch in data[t]:
-        loss.append(data[t][epoch]['loss'])
-        pitch.append(data[t][epoch]['pitch'])
-        duration.append(data[t][epoch]['duration'])
-        step.append(data[t][epoch]['step'])
+        loss.append(data[t][epoch]["loss"])
+        pitch.append(data[t][epoch]["pitch"])
+        duration.append(data[t][epoch]["duration"])
+        step.append(data[t][epoch]["step"])
     return {"loss": loss, "pitch": pitch, "duration": duration, "step": step}
 
 
@@ -34,10 +35,7 @@ def load_data(file: str) -> dict:
 
 
 
-def line_plot(plot: plt.Axes, numbers: [int], title: str, ylabel: str, xlabel: str = 'Epochs'):
-    x = []
-    for i in range(len(numbers)):
-        x.append(i)
+def line_plot(plot: plt.Axes, numbers: [int], title: str, ylabel: str = "", xlabel: str = "Epochs"):
     plot.plot(numbers)
     plot.set_title(title)
     plot.set_ylabel(ylabel)
@@ -46,20 +44,42 @@ def line_plot(plot: plt.Axes, numbers: [int], title: str, ylabel: str, xlabel: s
 def plot_loss(data: dict, data_type: str, loss: bool, pitch: bool, step: bool, duration: bool):
     left = int(loss) + int(pitch)
     right = int(step) + int(duration)
-
+    figure_count = 1
+    if left > 0 and right > 0:
+        figure_count = 2
     if left + right == 0:
         raise Exception("Cannot generate plot when no loss type is enabled")
-    fig, axs = plt.subplots(left, right)
-    fig.suptitle(f"The evolution of loss during the {data_type} phase")
-    if loss:
-        line_plot(axs[0,0], data['loss'],     f"Total loss during {data_type}",           "Total loss")
-    if pitch:
-        line_plot(axs[1,0], data['pitch'],    f"Total pitch loss during {data_type}",     "Pitch loss")
-    if step:
-        line_plot(axs[0,1], data['step'],     f"Total step loss during {data_type}",      "Step loss")
-    if duration:
-        line_plot(axs[1,1], data['duration'], f"Total duration loss during {data_type}",  "Duration loss")
-    fig.tight_layout()
+    
+    figure = plt.figure(constrained_layout=True)
+    figure.suptitle(f"The evolution of loss during {data_type}", fontsize="xx-large")
+    subfigures = figure.subfigures(1, figure_count, wspace=0.02)
+    figure_curr = subfigures
+    if left > 0:
+        count = 1
+        if loss and pitch:
+            count = 2
+        if right > 0: figure_curr = subfigures[0]
+        axs_left = figure_curr.subplots(count, 1, sharex=True)
+        if issubclass(type(axs_left), Axes):
+            axs_left = [axs_left, axs_left]
+        if loss:
+            line_plot(axs_left[0], data["loss"],    "Total loss")
+        if pitch:
+            line_plot(axs_left[1], data["pitch"],   "Pitch loss")
+    
+    if right > 0:
+        count = 1
+        if step and duration:
+            count = 2
+        if right > 0: figure_curr = subfigures[1]
+        axs_right = figure_curr.subplots(count, 1, sharex=True)
+        if issubclass(type(axs_right), Axes):
+            axs_right = [axs_right, axs_right]
+        if step:
+            line_plot(axs_right[0], data["step"],     "Step loss")
+        if duration:
+            line_plot(axs_right[1], data["duration"], "Duration loss")
+    figure
 
 
 @dataclass
@@ -85,12 +105,13 @@ def main():
     args = parser.parse_args()
     params: Params = args.params
     data = load_data(f"./{params.models_dir}/{params.model}/{params.model}.json")
+
     if not params.test and not params.train:
         raise Exception("No graphs to display when both training and testing graphs are disabled")
     if params.test:
-        plot_loss(data['test_loss'], "testing", params.loss, params.pitch, params.step, params.duration)
+        plot_loss(data["test_loss"], "testing", params.loss, params.pitch, params.step, params.duration)
     if params.train:
-        plot_loss(data['training_loss'], "training", params.loss, params.pitch, params.step, params.duration)
+        plot_loss(data["training_loss"], "training", params.loss, params.pitch, params.step, params.duration)
     plt.show()
 
 main()
