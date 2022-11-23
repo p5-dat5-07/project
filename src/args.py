@@ -35,7 +35,7 @@ class Mode:
 @dataclass
 class Params:
     """ Parameters for ajusting the model """
-    epochs:                 int   = 50      # The amount of Epochs.
+    epochs:                 int   = 2      # The amount of Epochs.
     sequence_length:        int   = 64      # The amount of notes per sequence.
     batch_size:             int   = 50      # The batch size.
     learning_rate:          float = 0.001   # The learning rate.

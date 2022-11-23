@@ -104,9 +104,6 @@ class Model:
             print("epoch:", epoch)
             self.train(self.training_data, callback)
             self.test(self.test_data, callback)
-            
-            print(callback.test_list)
-            print(callback.train_list)
 
             if save and epoch % (self.params.epochs_between_samples) == 0 and epoch > 0:
                 os.mkdir(f"./models/{model_name}/epoch{epoch}")
@@ -115,8 +112,13 @@ class Model:
                     self.generate_notes(self.files[self.params.sample_location+i], f"./models/{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
         
         self.model.save( f"./models/{model_name}/{model_name}.h5")
+        jf_dict = {
+            'hyperparameters': self.params.to_dict(),
+            'training_loss': {'epoch' + str(i): dict(map(lambda item: (item[0], float(item[1])), x.items())) for i, x in enumerate(callback.train_list)},
+            'test_loss': {'epoch' + str(i): dict(map(lambda item: (item[0], float(item[1])), x.items())) for i, x in enumerate(callback.test_list)},
+        }
         with open( f"./models/{model_name}/{model_name}.json", "w") as f:
-            f.write(json.dumps(self.params.to_dict()))
+            f.write(json.dumps(jf_dict, indent=4))
     
     @tf.function
     def train_step(self, x_batch_train, y_batch_train, keys: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
@@ -155,14 +157,16 @@ class Model:
         return (pitch_loss, step_loss, duration_loss)
 
     def train(self, training_data: tf.data.Dataset, callback: Callback):
+        max_step = len(list(training_data)) - 1
         for step, (x_batch_train, y_batch_train, keys) in enumerate(training_data):
             (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
-            callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='train')
+            callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='train', max_step=max_step)
 
     def test(self, test_data: tf.data.Dataset, callback: Callback):
+        max_step = len(list(test_data)) - 1
         for step, (x_batch_train, y_batch_train, keys) in enumerate(test_data):
             (pitch_loss, step_loss, duration_loss) = self.train_step(x_batch_train, y_batch_train, keys)
-            callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='test')
+            callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='test', max_step=max_step)
 
     def generate_notes(self, in_file: str, out_file: str):
         instrument = pretty_midi.PrettyMIDI(in_file).instruments[0]
