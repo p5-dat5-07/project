@@ -2,6 +2,7 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 import pretty_midi
+import pretty_midi_rs
 import glob
 import pathlib
 import collections
@@ -225,7 +226,7 @@ class Model:
         return sequences.map(split_labels)
 
     def generate_notes(self, in_file: str, out_file: str):
-        instrument = pretty_midi.PrettyMIDI(in_file).instruments[0]
+        instrument = pretty_midi_rs.MidiObject(in_file).instruments[0]
         instrument_name = pretty_midi.program_to_instrument_name(instrument.program)
 
         raw_notes = self.midi_to_notes(in_file)
@@ -294,7 +295,7 @@ class Model:
         return int(pitch), float(step), float(duration)
     
     def midi_to_notes(self, file: str) -> pd.DataFrame:
-        pm = pretty_midi.PrettyMIDI(file)
+        pm = pretty_midi_rs.MidiObject(file)
         instrument = pm.instruments[0]
         notes = collections.defaultdict(list)
         # Sort the notes by start time
