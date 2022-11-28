@@ -5,7 +5,7 @@ import pathlib
 from consts import *
 from model import Model
 from callback import Cb1
-from loss import MusicLoss
+from loss import MusicLoss, MusicLossBasic
 from args import parser, Train, Generate, Data, Base
 from data_manager import DataManager
 
