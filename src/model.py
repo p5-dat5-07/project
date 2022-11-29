@@ -24,15 +24,19 @@ class Model:
     key_order:      [str]
     training_data:  tf.data.Dataset
     test_data:      tf.data.Dataset
+    fixed_seed:     int
 
     def __init__(self, params: Params, pitch_loss: Loss, step_loss: Loss, duration_loss: Loss,
-                    optimizer: Optimizer):
+                    optimizer: Optimizer, fixed_seed: int):
         self.params         = params
         self.pitch_loss     = pitch_loss
         self.step_loss      = step_loss
         self.duration_loss  = duration_loss
         self.optimizer      = optimizer
         self.key_order      = ["pitch", "step", "duration"]
+        self.fixed_seed     = fixed_seed
+        if self.fixed_seed != 0:
+            tf.keras.utils.set_random_seed(self.fixed_seed)
 
     def load(self, model_name):
         self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
@@ -57,29 +61,86 @@ class Model:
     def summary(self):
         print(self.params.summary())
         self.model.summary()
+
+    def create_model_base(self, model: int):
+        if model == 0:
+            self.create_base_model()
+        elif model == 1:
+            self.create_large_model()
+        elif model == 2:
+            self.create_large_bi_model()
+        else:
+            raise Exception("Invalid model number")
+
+    def create_large_bi_model(self):
+        input_shape = (self.params.sequence_length, 3)  
+        input_layer = tf.keras.Input(input_shape)
+
+        x = Bidirectional(LSTM(256, return_sequences=True))(input_layer)
+        d1 = Dropout(0.3)(x)
+
+        ph1 = Bidirectional(LSTM(128, name="pitch_hidden1"))(d1)
+        sh1 = Bidirectional(LSTM(128, name="step_hidden1"))(d1)
+        dh1 = Bidirectional(LSTM(128, name="duration_hidden1"))(d1)
+
+        d2 = Dropout(0.3)(ph1)
+        d3 = Dropout(0.3)(sh1)
+        d4 = Dropout(0.3)(dh1)
+
+        ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
+        sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
+        dh2 = Dense(30,   activation="relu", name="duration_hidden2")(d4)
+
+        d5 = Dropout(0.3)(ph2)
+        d6 = Dropout(0.3)(sh2)
+        d7 = Dropout(0.3)(dh2)
+
+        output_layers = {
+            "pitch": Dense(128, name="pitch")(d5),
+            "step": Dense(1,  activation="relu", name="step")(d6),
+            "duration": Dense(1, activation="relu", name="duration")(d7),
+        }
+        self.model = tf.keras.Model(input_layer, output_layers)
+
+    def create_large_model(self):
+        input_shape = (self.params.sequence_length, 3)  
+        input_layer = tf.keras.Input(input_shape)
+
+        x = LSTM(256, return_sequences=True)(input_layer)
+        d1 = Dropout(0.3)(x)
+
+        ph1 = LSTM(128, name="pitch_hidden1")(d1)
+        sh1 = LSTM(128, name="step_hidden1")(d1)
+        dh1 = LSTM(128, name="duration_hidden1")(d1)
+
+        d2 = Dropout(0.3)(ph1)
+        d3 = Dropout(0.3)(sh1)
+        d4 = Dropout(0.3)(dh1)
+
+        ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
+        sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
+        dh2 = Dense(30,   activation="relu", name="duration_hidden2")(d4)
+
+        d5 = Dropout(0.3)(ph2)
+        d6 = Dropout(0.3)(sh2)
+        d7 = Dropout(0.3)(dh2)
+
+        output_layers = {
+            "pitch": Dense(128, name="pitch")(d5),
+            "step": Dense(1,  activation="relu", name="step")(d6),
+            "duration": Dense(1, activation="relu", name="duration")(d7),
+        }
+        self.model = tf.keras.Model(input_layer, output_layers)
     
-    def create_model(self):
+    def create_base_model(self):
         input_shape = (self.params.sequence_length, 3)  
         input_layer = tf.keras.Input(input_shape)
 
         x = LSTM(128)(input_layer)
-        #d1 = Dropout(0.3)(x)
-#
-        #ph1 = Bidirectional(GRU(128, name="pitch_hidden1"))(d1)
-        #sh1 = Bidirectional(GRU(128, name="step_hidden1"))(d1)
-        #dh1 = Bidirectional(GRU(128, name="duration_hidden1"))(d1)
-#
-        #d2 = Dropout(0.3)(ph1)
-        #d3 = Dropout(0.3)(sh1)
-        #d4 = Dropout(0.3)(dh1)
-#
-        ph2 = Dense(30,  activation="tanh", name="pitch_hidden2")(x)
+
+        ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(x)
         sh2 = Dense(30,   activation="relu", name="step_hidden2")(x)
         dh2 = Dense(30,   activation="relu", name="duration_hidden2")(x)
-#
-        #d5 = Dropout(0.3)(ph2)
-        #d6 = Dropout(0.3)(sh2)
-        #d7 = Dropout(0.3)(dh2)
 
         output_layers = {
             "pitch": Dense(128, name="pitch")(ph2),
@@ -197,6 +258,16 @@ class Model:
             sample_notes[:self.params.sequence_length] / np.array([self.params.vocab_size, 1, 1]))
 
         prev_start = 0
+
+        # Initial notes
+        for x in input_notes:
+            pitch, step, duration = x[0] * 128, x[1], x[2]
+            start = prev_start + step
+            generated_notes["pitch"].append(pitch)
+            generated_notes["step"].append(step)
+            generated_notes["duration"].append(duration)
+            prev_start = start
+
         # Generates
         for i in range(self.params.notes_per_sample):
             pitch, step, duration = self.predict_next_note(input_notes, self.params.sample_temprature) # temprature param

@@ -6,10 +6,11 @@ class Base:
 
 @dataclass
 class Generate(Base):
-    input:  str             # The input directory or file to get the initial midi sequence(s) from.
-    output: str             # The output directory or file to write the midi sequence(s) to.
-    amount: int = 1         # The amount of versions generated per input file.
-    name:   str = "model"   # The name of the model.
+    input:      str             # The input directory or file to get the initial midi sequence(s) from.
+    output:     str             # The output directory or file to write the midi sequence(s) to.
+    amount:     int = 1         # The amount of versions generated per input file.
+    name:       str = "model"   # The name of the model.
+    fixed_seed: int = 0         # Sets fixed seed 
 
 
 @dataclass
@@ -24,11 +25,16 @@ class Data(Base):
 
 @dataclass
 class Train(Base):
-    name:       str     = "model"                       # The name of the model.
-    model_dir:  str     = "./models"                    # The directory containing the models
-    data:       str     = "./datasets/maestro_10"       # The path to the data directory.
-    sample_dir: str     = "./data/q-maestro-v2.0.0"     # The sample director to get the sample midi sequence(s) from.
-    save:       bool    = True                          # Wether to save the model
+    name:           str     = "model"                       # The name of the model.
+    model_dir:      str     = "./models"                    # The directory containing the models
+    data:           str     = "./datasets/maestro_10"       # The path to the data directory.
+    sample_dir:     str     = "./data/q-maestro-v2.0.0"     # The sample director to get the sample midi sequence(s) from.
+    save:           bool    = True                          # Wether to save the model
+    model:          int     = 0                             # Selects the model to use (0: base, 1: large, 2: large bidirectional)
+    music_theory:   int     = 0                             # Selects the music theory to use (0: none, 1: cross, mse, 2: mse, mse)
+    fixed_seed:     int     = 0                             # Sets fixed seed
+    key_weight:     float   = 1                             # Sets the key weight of music theory only works on (1, 2)
+    octave_weight:  float   = 1                             # Sets the octave weight of music theory only works on (1, 2)
 
 @dataclass
 class Mode:

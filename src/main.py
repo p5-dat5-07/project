@@ -5,7 +5,7 @@ import pathlib
 from consts import *
 from model import Model
 from callback import Cb1
-from loss import MusicLoss, MusicLossBasic
+from loss import MusicLoss, MusicLoss2, MusicLossBasic
 from args import parser, Train, Generate, Data, Base
 from data_manager import DataManager
 
@@ -15,12 +15,25 @@ def main():
     params = args.params
     mode = args.mode.mode
 
-    model = Model(params=params, pitch_loss=MusicLoss(params.batch_size),
-        step_loss=mean_squared_error, duration_loss=mean_squared_error,
-        optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate))
     if type(mode) is Train:
         mode: Train = mode
-        model.create_model()
+        music_loss: Loss
+        if mode.music_theory == 0:
+            music_loss = MusicLossBasic(params.batch_size)
+        elif mode.music_theory == 1:
+            music_loss = MusicLoss(params.batch_size, mode.key_weight, mode.octave_weight)
+        elif mode.music_theory == 2:
+            music_loss = MusicLoss2(params.batch_size, mode.key_weight, mode.octave_weight)
+        else:
+            raise Exception("Invalid music theory number")
+
+        model = Model(
+            params=params, pitch_loss=music_loss,
+            step_loss=mean_squared_error, duration_loss=mean_squared_error,
+            optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate),
+            fixed_seed=mode.fixed_seed
+        )
+        model.create_model(mode.large_model)
         model.summary()
         model.load_dataset(mode.data, mode.sample_dir)
         model.train_model(mode.name, mode.model_dir, mode.sample_dir, mode.save, callback = Cb1())
@@ -30,6 +43,12 @@ def main():
         dm.generate_dataset()
     elif type(mode) is Generate:
         mode: Generate = mode
+        model = Model(
+            params=params, pitch_loss=MusicLoss(params.batch_size),
+            step_loss=mean_squared_error, duration_loss=mean_squared_error,
+            optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate),
+            fixed_seed=mode.fixed_seed
+        )
         model.load(mode.name)
         if os.path.isdir(mode.input):
             files = glob.glob(str(pathlib.Path(mode.input)/"**/*.mid*"), recursive=True)
