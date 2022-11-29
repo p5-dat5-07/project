@@ -62,7 +62,7 @@ class Model:
         print(self.params.summary())
         self.model.summary()
 
-    def create_model_base(self, model: int):
+    def create_model(self, model: int):
         if model == 0:
             self.create_base_model()
         elif model == 1:
@@ -173,8 +173,13 @@ class Model:
                     self.generate_notes(self.files[self.params.sample_location+i], f"{model_dir}/{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
         
         self.model.save( f"{model_dir}/{model_name}/{model_name}.h5")
+
+        hp = self.params.to_dict()
+        hp['key_weight'] = self.pitch_loss.key_weight
+        hp['octave_weight'] = self.pitch_loss.octave_weight
+        hp['seed'] = self.fixed_seed
         jf_dict = {
-            'hyperparameters': self.params.to_dict(),
+            'hyperparameters': hp,
             'training_loss': {
                 'loss': callback.train_list[0],
                 'pitch': callback.train_list[1],

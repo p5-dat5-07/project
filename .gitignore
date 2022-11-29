@@ -4,4 +4,5 @@ data
 training_checkpoints
 __pycache__
 models
+models_final
 datasets

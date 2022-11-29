@@ -45,9 +45,13 @@ class MusicLoss2():
         return sparse_entrophy(y_true, y_pred) + self.key_weight * mean_squared_error(f, tr) + mean_squared_error(true_octave, pred_octave)
         
 class MusicLossBasic():
+    key_weight:     float
+    octave_weight:  float
     batch_size: int
     def __init__(self, batch_size):
         self.batch_size = batch_size
+        self.key_weight = 0
+        self.octave_weight = 0
     
     @tf.function
     def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, keys: tf.Tensor):

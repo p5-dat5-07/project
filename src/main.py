@@ -33,7 +33,7 @@ def main():
             optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate),
             fixed_seed=mode.fixed_seed
         )
-        model.create_model(mode.large_model)
+        model.create_model(mode.model)
         model.summary()
         model.load_dataset(mode.data, mode.sample_dir)
         model.train_model(mode.name, mode.model_dir, mode.sample_dir, mode.save, callback = Cb1())
