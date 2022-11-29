@@ -62,29 +62,29 @@ class Model:
         input_shape = (self.params.sequence_length, 3)  
         input_layer = tf.keras.Input(input_shape)
 
-        x = LSTM(128)(input_layer)
-        #d1 = Dropout(0.3)(x)
+        x = Bidirectional(LSTM(256, return_sequences=True))(input_layer)
+        d1 = Dropout(0.3)(x)
 #
-        #ph1 = Bidirectional(GRU(128, name="pitch_hidden1"))(d1)
-        #sh1 = Bidirectional(GRU(128, name="step_hidden1"))(d1)
-        #dh1 = Bidirectional(GRU(128, name="duration_hidden1"))(d1)
+        ph1 = Bidirectional(LSTM(128, name="pitch_hidden1"))(d1)
+        sh1 = Bidirectional(LSTM(128, name="step_hidden1"))(d1)
+        dh1 = Bidirectional(LSTM(128, name="duration_hidden1"))(d1)
 #
-        #d2 = Dropout(0.3)(ph1)
-        #d3 = Dropout(0.3)(sh1)
-        #d4 = Dropout(0.3)(dh1)
+        d2 = Dropout(0.3)(ph1)
+        d3 = Dropout(0.3)(sh1)
+        d4 = Dropout(0.3)(dh1)
 #
-        ph2 = Dense(30,  activation="tanh", name="pitch_hidden2")(x)
-        sh2 = Dense(30,   activation="relu", name="step_hidden2")(x)
-        dh2 = Dense(30,   activation="relu", name="duration_hidden2")(x)
+        ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
+        sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
+        dh2 = Dense(30,   activation="relu", name="duration_hidden2")(d4)
 #
-        #d5 = Dropout(0.3)(ph2)
-        #d6 = Dropout(0.3)(sh2)
-        #d7 = Dropout(0.3)(dh2)
+        d5 = Dropout(0.3)(ph2)
+        d6 = Dropout(0.3)(sh2)
+        d7 = Dropout(0.3)(dh2)
 
         output_layers = {
-            "pitch": Dense(128, name="pitch")(ph2),
-            "step": Dense(1,  activation="relu", name="step")(sh2),
-            "duration": Dense(1, activation="relu", name="duration")(dh2),
+            "pitch": Dense(128, name="pitch")(d5),
+            "step": Dense(1,  activation="relu", name="step")(d6),
+            "duration": Dense(1, activation="relu", name="duration")(d7),
         }
         self.model = tf.keras.Model(input_layer, output_layers)
 

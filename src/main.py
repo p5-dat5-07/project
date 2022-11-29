@@ -15,7 +15,7 @@ def main():
     params = args.params
     mode = args.mode.mode
 
-    model = Model(params=params, pitch_loss=MusicLoss(params.batch_size),
+    model = Model(params=params, pitch_loss=MusicLossBasic(params.batch_size),
         step_loss=mean_squared_error, duration_loss=mean_squared_error,
         optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate))
     if type(mode) is Train:
