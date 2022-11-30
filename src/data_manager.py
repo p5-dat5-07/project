@@ -82,9 +82,9 @@ class DataManager:
             }))
 
 
-    def create_sequences(self, dataset: tf.data.Dataset, file_path: str) -> [tf.data.Dataset]:
+    def create_sequences(self, dataset: tf.data.Dataset, file_path: str):
         """Returns TF Dataset of sequence and label examples."""
-        sequence_length = self.params.sequence_length+1
+        sequence_length = 64+1
 
         # Take 1 extra for the labels
         windows = dataset.window(sequence_length, shift=1, stride=1,
@@ -94,21 +94,33 @@ class DataManager:
         flatten = lambda x: x.batch(sequence_length, drop_remainder=True)
         sequences = windows.flat_map(flatten)
 
+        
+
         # Normalize note pitch
         def scale_pitch(x):
             x = x/[self.params.vocab_size,1.0,1.0]
-            return x
+            p, s, d = tf.split(x, num_or_size_splits=3, axis=-1)
+            return (p, s, d)
 
+        def analyze_sequence(sequence):
+            step = tf.slice(sequence, [self.params.sequence_length - 10, 1], [10, 1])
+            dur = tf.slice(sequence, [0, 2], [self.params.sequence_length, 1])
+            max = tf.reduce_max(dur)
+            min = tf.reduce_min(dur)
+            test = tf.less_equal(step, tf.constant([0.1], dtype=tf.float64))
+            r = tf.reduce_any(test, 1)
+            sum = tf.reduce_sum(tf.cast(r, tf.float32))
+            return sum, max, min
+            
         # Split the labels
         def split_labels(sequences):
             inputs = sequences[:-1]
             labels_dense = sequences[-1]
             labels = {key:labels_dense[i] for i,key in enumerate(self.key_order)}
-            labels['step'] += [self.settings.nudge_step]
-            labels['duration'] += [self.settings.nudge_duration]
-            return scale_pitch(inputs), labels, self.get_key_in_filename(file_path)
-        
-        return sequences.map(split_labels)
+            return scale_pitch(inputs), labels, self.get_key_in_filename(file_path), analyze_sequence(sequences)
+
+        s = sequences.map(split_labels)
+        return s
 
     def anders_pre(self, key, notes):
         acceptable_chords = chords[key]

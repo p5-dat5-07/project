@@ -5,7 +5,7 @@ import pathlib
 from consts import *
 from model import Model
 from callback import Cb1
-from loss import MusicLoss, MusicLoss2, MusicLossBasic
+from loss import MusicLoss, MusicLoss2, MusicLossBasic, stepLoss, durationLoss
 from args import parser, Train, Generate, Data, Base
 from data_manager import DataManager
 
@@ -18,18 +18,26 @@ def main():
     if type(mode) is Train:
         mode: Train = mode
         music_loss: Loss
+        step_loss: Loss
+        duration_loss: Loss
         if mode.music_theory == 0:
             music_loss = MusicLossBasic(params.batch_size)
+            step_loss = stepLoss()
+            duration_loss = durationLoss(params.batch_size)
         elif mode.music_theory == 1:
+            step_loss = stepLoss()
+            duration_loss = durationLoss(params.batch_size)
             music_loss = MusicLoss(params.batch_size, mode.key_weight, mode.octave_weight)
         elif mode.music_theory == 2:
+            step_loss = stepLoss()
+            duration_loss = durationLoss(params.batch_size)
             music_loss = MusicLoss2(params.batch_size, mode.key_weight, mode.octave_weight)
         else:
             raise Exception("Invalid music theory number")
 
         model = Model(
             params=params, pitch_loss=music_loss,
-            step_loss=mean_squared_error, duration_loss=mean_squared_error,
+            step_loss=step_loss, duration_loss=duration_loss,
             optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate),
             fixed_seed=mode.fixed_seed
         )

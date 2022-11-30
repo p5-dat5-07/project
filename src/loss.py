@@ -1,5 +1,25 @@
 from consts import *
 
+class stepLoss():
+    def __init__(self):
+        self.step_scale = tf.constant([0.1], dtype=tf.float32)
+    
+    @tf.function
+    def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, sum: tf.Tensor):
+        return mean_squared_error(y_true=y_true, y_pred=y_pred) + tf.reduce_mean(tf.multiply(sum, self.step_scale))
+        
+class durationLoss():
+    def __init__(self, batch_size: int):
+        self.batch_size = batch_size
+        self.zero = tf.fill((self.batch_size, 1), 0.0)
+    
+    @tf.function
+    def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, max: tf.Tensor, min: tf.Tensor):
+        less = tf.cast(tf.less(y_true, min), dtype=tf.float32)
+        great = tf.cast(tf.greater(y_true, max), dtype=tf.float32)
+        add = tf.add(less, great)
+        return mean_squared_error(y_true=y_true, y_pred=y_pred) + mean_squared_error(add, self.zero)
+        
 class MusicLoss():
     key_weight:     float
     octave_weight:  float
