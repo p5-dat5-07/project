@@ -114,7 +114,7 @@ def main():
         if params.save:
             figure.savefig(f"./{params.models_dir}/{params.model}/testing.svg", format="svg")
     if params.train:
-        plot_loss(data["training_loss"], "training", params.loss, params.pitch, params.step, params.duration)
+        figure = plot_loss(data["training_loss"], "training", params.loss, params.pitch, params.step, params.duration)
         if params.save:
             figure.savefig(f"./{params.models_dir}/{params.model}/training.svg", format="svg")
     if not params.save:
