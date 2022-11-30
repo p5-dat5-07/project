@@ -257,8 +257,7 @@ class Model:
         return (pitch_loss, step_loss, duration_loss)
 
     @tf.function
-    def test_step(self, x_batch_train, y_batch_train, keys: tf.Tensor, sum: tf.Tensor, max: tf.Tensor, min: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
-        p, s, d = tf.split(x_batch_train, num_or_size_splits=3, axis=-1)
+    def test_step(self, p,s,d, y_batch_train, keys: tf.Tensor, sum: tf.Tensor, max: tf.Tensor, min: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
         logits = self.model([p,s,d], training=True)  # Logits for this minibatch
     
         # Compute the loss value for this minibatch.
@@ -337,8 +336,9 @@ class Model:
 
         # Add batch dimension
         inputs = tf.expand_dims(notes, 0)
+        p, s, d = tf.split(inputs, num_or_size_splits=3, axis=-1)
 
-        predictions = self.model.predict(inputs, verbose=0)
+        predictions = self.model.predict([p, s, d], verbose=0)
         pitch_logits = predictions["pitch"]
         step = predictions["step"]
         duration = predictions["duration"]
