@@ -110,13 +110,13 @@ class Model:
         si = tf.keras.Input(input_shape['step'])
         di = tf.keras.Input(input_shape['duration'])
 
-        pl = LSTM(256, return_sequences=True)(pi)
-        sl = LSTM(256, return_sequences=True)(si)
-        dl = LSTM(256, return_sequences=True)(di)
+        pl = LSTM(256)(pi)
+        sl = LSTM(256)(si)
+        dl = LSTM(256)(di)
 
-        ph1 = LSTM(128, name="pitch_hidden1")(pl)
-        sh1 = LSTM(128, name="step_hidden1")(sl)
-        dh1 = LSTM(128, name="duration_hidden1")(dl)
+        ph1 = Dense(128, name="pitch_hidden1")(pl)
+        sh1 = Dense(30, name="step_hidden1")(sl)
+        dh1 = Dense(30, name="duration_hidden1")(dl)
 
         d2 = Dropout(0.3)(ph1)
         d3 = Dropout(0.3)(sh1)
@@ -125,6 +125,39 @@ class Model:
         ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
         sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
         dh2 = Dense(30,   activation="relu", name="duration_hidden2")(d4)
+
+        d5 = Dropout(0.3)(ph2)
+        d6 = Dropout(0.3)(sh2)
+        d7 = Dropout(0.3)(dh2)
+
+        output_layers = {
+            "pitch": Dense(128, name="pitch")(d5),
+            "step": Dense(1,  activation="relu", name="step")(d6),
+            "duration": Dense(1, activation="relu", name="duration")(d7),
+        }
+        self.model = tf.keras.Model([pi, si, di], output_layers)
+
+    def create_model_swithd(self):
+        input_shape = {'pitch': (self.params.sequence_length, 1), 'sd': (self.params.sequence_length, 2)}   
+        #input_layer = tf.keras.Input(input_shape)
+
+        pi = tf.keras.Input(input_shape['pitch'])
+        sdi = tf.keras.Input(input_shape['sd'])
+
+        pl = LSTM(256, return_sequences=True)(pi)
+        sdl = LSTM(256, return_sequences=True)(sdi)
+
+        ph1 = Dense(128, name="pitch_hidden1")(pl)
+        sh1 = Dense(30, name="step_hidden1")(sdl)
+        dh1 = Dense(30, name="duration_hidden1")(sdl)
+
+        d2 = Dropout(0.3)(ph1)
+        d3 = Dropout(0.3)(sh1)
+        d4 = Dropout(0.3)(dh1)
+
+        ph2 = Dense(128, activation="tanh", name="pitch_hidden2")(d2)
+        sh2 = Dense(30, activation="relu", name="step_hidden2")(d3)
+        dh2 = Dense(30, activation="relu", name="duration_hidden2")(d4)
 
         d5 = Dropout(0.3)(ph2)
         d6 = Dropout(0.3)(sh2)
@@ -148,9 +181,9 @@ class Model:
         sh1 = LSTM(128, name="step_hidden1")(d1)
         dh1 = LSTM(128, name="duration_hidden1")(d1)
 
-        d2 = Dropout(0.3)(ph1)
-        d3 = Dropout(0.3)(sh1)
-        d4 = Dropout(0.3)(dh1)
+        d2 = Dropout(0.0)(ph1)
+        d3 = Dropout(0.0)(sh1)
+        d4 = Dropout(0.0)(dh1)
 
         ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
         sh2 = Dense(30,   activation="relu", name="step_hidden2")(d3)
@@ -232,13 +265,13 @@ class Model:
             f.write(json.dumps(jf_dict, indent=4))
     
     @tf.function
-    def train_step(self, p,s,d, y_batch_train, keys: tf.Tensor, sum: tf.Tensor, max: tf.Tensor, min: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
+    def train_step(self, x, y_batch_train, keys: tf.Tensor, sum: tf.Tensor, max: tf.Tensor, min: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
         with tf.GradientTape() as tape:
             # Run the forward pass of the layer.
             # The operations that the layer applies
             # to its inputs are going to be recorded
             # on the GradientTape.
-            logits = self.model([p,s,d], training=True)  # Logits for this minibatch
+            logits = self.model(x, training=True)  # Logits for this minibatch
         
             # Compute the loss value for this minibatch.
             pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
@@ -257,8 +290,8 @@ class Model:
         return (pitch_loss, step_loss, duration_loss)
 
     @tf.function
-    def test_step(self, p,s,d, y_batch_train, keys: tf.Tensor, sum: tf.Tensor, max: tf.Tensor, min: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
-        logits = self.model([p,s,d], training=True)  # Logits for this minibatch
+    def test_step(self, x, y_batch_train, keys: tf.Tensor, sum: tf.Tensor, max: tf.Tensor, min: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
+        logits = self.model(x, training=True)  # Logits for this minibatch
     
         # Compute the loss value for this minibatch.
         pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
@@ -269,14 +302,14 @@ class Model:
 
     def train(self, training_data: tf.data.Dataset, callback: Callback):
         max_step = len(list(training_data)) - 1
-        for step, ((p,s,d), y_batch_train, keys, (sum, max, min)) in enumerate(training_data):
-            (pitch_loss, step_loss, duration_loss) = self.train_step(p,s,d, y_batch_train, keys, sum, max, min)
+        for step, (x, y_batch_train, keys, (sum, max, min)) in enumerate(training_data):
+            (pitch_loss, step_loss, duration_loss) = self.train_step(x, y_batch_train, keys, sum, max, min)
             callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='train', max_step=max_step)
 
     def test(self, test_data: tf.data.Dataset, callback: Callback):
         max_step = len(list(test_data)) - 1
-        for step, ((p,s,d), y_batch_train, keys, (sum, max, min)) in enumerate(test_data):
-            (pitch_loss, step_loss, duration_loss) = self.test_step(p,s,d, y_batch_train, keys, sum, max, min)
+        for step, (x, y_batch_train, keys, (sum, max, min)) in enumerate(test_data):
+            (pitch_loss, step_loss, duration_loss) = self.test_step(x, y_batch_train, keys, sum, max, min)
             callback(i=step, pitch=pitch_loss, step=step_loss, duration=duration_loss, mode='test', max_step=max_step)
 
     def generate_notes(self, in_file: str, out_file: str):

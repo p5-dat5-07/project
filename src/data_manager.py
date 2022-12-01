@@ -99,12 +99,13 @@ class DataManager:
         # Normalize note pitch
         def scale_pitch(x):
             x = x/[self.params.vocab_size,1.0,1.0]
-            p, s, d = tf.split(x, num_or_size_splits=3, axis=-1)
-            return (p, s, d)
+            #p, s, d = tf.split(x, num_or_size_splits=3, axis=-1)
+            #return (p, s, d)
+            return x
 
         def analyze_sequence(sequence):
             step = tf.slice(sequence, [self.params.sequence_length - 10, 1], [10, 1])
-            dur = tf.slice(sequence, [0, 2], [self.params.sequence_length, 1])
+            dur = tf.slice(sequence, [self.params.sequence_length - 32, 2], [32, 1])
             max = tf.reduce_max(dur)
             min = tf.reduce_min(dur)
             test = tf.less_equal(step, tf.constant([0.1], dtype=tf.float64))

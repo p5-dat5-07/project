@@ -5,7 +5,7 @@ import pathlib
 from consts import *
 from model import Model
 from callback import Cb1
-from loss import MusicLoss, MusicLoss2, MusicLossBasic, stepLoss, durationLoss
+from loss import MusicLoss, MusicLoss2, MusicLossBasic, stepLoss, durationLoss, stepLossNoL, durationLossNoL, MusicLossNoL
 from args import parser, Train, Generate, Data, Base
 from data_manager import DataManager
 
@@ -32,6 +32,10 @@ def main():
             step_loss = stepLoss()
             duration_loss = durationLoss(params.batch_size)
             music_loss = MusicLoss2(params.batch_size, mode.key_weight, mode.octave_weight)
+        elif mode.music_theory == 3:
+            step_loss = stepLossNoL()
+            duration_loss = durationLossNoL(params.batch_size)
+            music_loss = MusicLossNoL(params.batch_size, mode.key_weight, mode.octave_weight)
         else:
             raise Exception("Invalid music theory number")
 
