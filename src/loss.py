@@ -1,24 +1,41 @@
 from consts import *
 
 class stepLossNoL():
-    def __init__(self):
-        self.step_scale = tf.constant([0.1], dtype=tf.float32)
-    
-    @tf.function
-    def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, sum: tf.Tensor):
-        return tf.reduce_mean(tf.multiply(sum, self.step_scale))
-        
-class durationLossNoL():
-    def __init__(self, batch_size: int):
+    def __init__(self,  batch_size: int):
         self.batch_size = batch_size
+        self.step_scale = tf.constant([0.1], dtype=tf.float32)
         self.zero = tf.fill((self.batch_size, 1), 0.0)
+        self.ones = tf.fill((self.batch_size, 1), 1.0)
+
     
     @tf.function
     def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, max: tf.Tensor, min: tf.Tensor):
-        less = tf.cast(tf.less(y_true, min), dtype=tf.float32)
-        great = tf.cast(tf.greater(y_true, max), dtype=tf.float32)
-        add = tf.add(less, great)
-        return mean_squared_error(add, self.zero)
+        min = tf.cast(min, tf.float32)
+        max = tf.cast(min, tf.float32)
+        min = tf.reshape(min, y_pred.shape)
+        max = tf.reshape(max, y_pred.shape)
+
+        r1 = tf.math.subtract(y_pred, 0) + 1
+        r2 = tf.math.subtract(max, y_pred)   + 1   
+
+        return   cross_entropy_no_log(self.ones, r1)  + cross_entropy_no_log(self.ones, r2) + 1.5 * mean_squared_error(y_true, y_pred) 
+
+class durationLossNoL():
+    def __init__(self, batch_size: int):
+        self.batch_size = batch_size
+        self.ones = tf.fill((self.batch_size, 1), 1.0)
+    
+    @tf.function
+    def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, max: tf.Tensor, min: tf.Tensor):
+        min = tf.cast(min, tf.float32)
+        max = tf.cast(min, tf.float32)
+        min = tf.reshape(min, y_pred.shape)
+        max = tf.reshape(max, y_pred.shape)
+
+        r1 = tf.math.subtract(y_pred, min) + 1
+        r2 = tf.math.subtract(max, y_pred) + 1
+
+        return  cross_entropy_no_log(self.ones, r1)  + cross_entropy_no_log(self.ones, r2) + 1.5 *mean_squared_error(y_true, y_pred) 
         
 class MusicLossNoL():
     key_weight:     float
@@ -33,11 +50,12 @@ class MusicLossNoL():
     @tf.function
     def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, keys: tf.Tensor):
         sample_pred = tf.random.categorical(y_pred, num_samples=1)
-        y = tf.math.floormod(sample_pred, 12)
-        equal = tf.math.equal(y, keys)
-        f = tf.reduce_any(equal, 1)
+        self.keys = tf.reshape(tf.tile(keys, [self.batch_size]), [ self.batch_size, tf.shape(keys)[0]])
+        #y = tf.math.floormod(sample_pred, 12)
+        #equal = tf.math.equal(y, keys)
+        #f = tf.reduce_any(equal, 1)
         leap_pred = tf.abs(sample_pred - tf.cast(y_true, dtype=tf.int64))
-        return self.key_weight * cross_entropy(f, self.one) + self.octave_weight * mean_squared_error(leap_pred, self.one)
+        return  sparse_entrophy(y_true, y_pred) *0 + cross_entropy(y_pred=y_pred, y_true=self.keys) * self.key_weight + self.octave_weight * mean_squared_error(leap_pred, self.one)
 
 class stepLoss():
     def __init__(self):

@@ -104,14 +104,14 @@ class DataManager:
             return x
 
         def analyze_sequence(sequence):
-            step = tf.slice(sequence, [self.params.sequence_length - 10, 1], [10, 1])
-            dur = tf.slice(sequence, [self.params.sequence_length - 32, 2], [32, 1])
-            max = tf.reduce_max(dur)
-            min = tf.reduce_min(dur)
-            test = tf.less_equal(step, tf.constant([0.1], dtype=tf.float64))
-            r = tf.reduce_any(test, 1)
-            sum = tf.reduce_sum(tf.cast(r, tf.float32))
-            return sum, max, min
+            step = tf.slice(sequence, [0, 1], [self.params.sequence_length, 1])
+            dur = tf.slice(sequence, [self.params.sequence_length - 20, 2], [20, 1])
+            d_max = tf.reduce_max(dur)
+            d_min = tf.reduce_min(dur)
+            s_max = tf.reduce_max(step)
+            s_min = tf.reduce_min(step)
+            
+            return s_max, s_min, d_max,  d_min
             
         # Split the labels
         def split_labels(sequences):

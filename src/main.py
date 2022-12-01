@@ -22,18 +22,18 @@ def main():
         duration_loss: Loss
         if mode.music_theory == 0:
             music_loss = MusicLossBasic(params.batch_size)
-            step_loss = stepLoss()
+            step_loss = stepLoss(params.batch_size)
             duration_loss = durationLoss(params.batch_size)
         elif mode.music_theory == 1:
-            step_loss = stepLoss()
+            step_loss = stepLoss(params.batch_size)
             duration_loss = durationLoss(params.batch_size)
             music_loss = MusicLoss(params.batch_size, mode.key_weight, mode.octave_weight)
         elif mode.music_theory == 2:
-            step_loss = stepLoss()
+            step_loss = stepLoss(params.batch_size)
             duration_loss = durationLoss(params.batch_size)
             music_loss = MusicLoss2(params.batch_size, mode.key_weight, mode.octave_weight)
         elif mode.music_theory == 3:
-            step_loss = stepLossNoL()
+            step_loss = stepLossNoL(params.batch_size)
             duration_loss = durationLossNoL(params.batch_size)
             music_loss = MusicLossNoL(params.batch_size, mode.key_weight, mode.octave_weight)
         else:
