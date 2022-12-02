@@ -16,7 +16,7 @@ class Generate(Base):
 @dataclass
 class Data(Base):
     name:           str                             # The name of the dataset.
-    dataset_dir:    str = "./datasets/"             # The directory to store datasets.
+    dataset_dir:    str = "./datasets/"             # The directory to store datasets. 
     input:          str = "./data/q-maestro-v2.0.0" # The input directory or file to get the initial midi sequence(s) from.
     amount:         int = 10                        # The amount of files to add to the dataset.
     offset:         int = 0                         # The starting point in the dataset
@@ -53,7 +53,7 @@ class Params:
     step_loss_scaler:       float = 1.0     # The amount to scale the step loss.
     duration_loss_scaler:   float = 1.0     # The amount to scale the duration loss.
     vocab_size:             int   = 128     # The amount of pitches in midi file DONT CHANGE!
-    epochs_between_samples: int   = 1      # The amount of epochs between generating sample midi files.
+    epochs_between_samples: int   = 10      # The amount of epochs between generating sample midi files.
     samples_per_epoch:      int   = 5       # The amount of midi file samples.
     sample_location:        int   = 505     # The file to start from in the dataset when generating samples.
     notes_per_sample:       int   = 200     # The amount of notes to generate per sample.

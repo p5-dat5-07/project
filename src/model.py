@@ -186,7 +186,7 @@ class Model:
         d4 = Dropout(0.0)(dh1)
 
         ph2 = Dense(128,  activation="tanh", name="pitch_hidden2")(d2)
-        sh2 = Dense(30,   activation="leaky_relu", name="step_hidden2")(d3)
+        sh2 = Dense(30,   name="step_hidden2")(d3)
         dh2 = Dense(30,   activation="leaky_relu", name="duration_hidden2")(d4)
 
         d5 = Dropout(0.3)(ph2)
@@ -195,7 +195,7 @@ class Model:
 
         output_layers = {
             "pitch": Dense(128, name="pitch")(d5),
-            "step": Dense(1,  activation="leaky_relu", name="step")(d6),
+            "step": Dense(1, name="step")(d6),
             "duration": Dense(1, activation="leaky_relu", name="duration")(d7),
         }
         self.model = tf.keras.Model(input_layer, output_layers)
@@ -330,6 +330,7 @@ class Model:
             sample_notes[:self.params.sequence_length] / np.array([self.params.vocab_size, 1, 1]))
 
         prev_start = 0
+        prev_step = 0
 
         # Initial notes
         for x in input_notes:
@@ -343,6 +344,7 @@ class Model:
         # Generates
         for i in range(self.params.notes_per_sample):
             pitch, step, duration = self.predict_next_note(input_notes, self.params.sample_temprature) # temprature param
+
             start = prev_start + step
             end = start + duration
             input_note = (pitch, step, duration)
