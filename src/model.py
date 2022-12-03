@@ -273,7 +273,7 @@ class Model:
             # on the GradientTape.
             logits = self.model(x, training=True)  # Logits for this minibatch
             # Compute the loss value for this minibatch.
-            pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
+            pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"], keys[-1]) * self.params.pitch_loss_scaler
             step_loss = self.step_loss(y_batch_train["step"], logits["step"], s_max, s_min) * self.params.step_loss_scaler
             duration_loss = self.duration_loss(y_batch_train["duration"], logits["duration"], d_max, d_min) * self.params.duration_loss_scaler
 
@@ -293,7 +293,7 @@ class Model:
         logits = self.model(x, training=True)  # Logits for this minibatch
     
         # Compute the loss value for this minibatch.
-        pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"],  KEYS[keys[-1]]) * self.params.pitch_loss_scaler
+        pitch_loss = self.pitch_loss(y_batch_train["pitch"], logits["pitch"], keys[-1]) * self.params.pitch_loss_scaler
         step_loss = self.step_loss(y_batch_train["step"], logits["step"], s_max, s_min) * self.params.step_loss_scaler
         duration_loss = self.duration_loss(y_batch_train["duration"], logits["duration"], d_max, d_min) * self.params.duration_loss_scaler
 

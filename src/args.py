@@ -49,11 +49,11 @@ class Params:
     sequence_length:        int   = 64      # The amount of notes per sequence.
     batch_size:             int   = 50      # The batch size.
     learning_rate:          float = 0.001   # The learning rate.
-    pitch_loss_scaler:      float = 0.05    # The amount to scale the pitch loss.
+    pitch_loss_scaler:      float = 1.0     # The amount to scale the pitch loss.
     step_loss_scaler:       float = 1.0     # The amount to scale the step loss.
     duration_loss_scaler:   float = 1.0     # The amount to scale the duration loss.
     vocab_size:             int   = 128     # The amount of pitches in midi file DONT CHANGE!
-    epochs_between_samples: int   = 1      # The amount of epochs between generating sample midi files.
+    epochs_between_samples: int   = 1       # The amount of epochs between generating sample midi files.
     samples_per_epoch:      int   = 5       # The amount of midi file samples.
     sample_location:        int   = 505     # The file to start from in the dataset when generating samples.
     notes_per_sample:       int   = 200     # The amount of notes to generate per sample.

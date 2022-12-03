@@ -105,18 +105,18 @@ parser.add_arguments(Params, dest="params")
 def main():
     args = parser.parse_args()
     params: Params = args.params
-    data = load_data(f"./{params.models_dir}/{params.model}/{params.model}.json")
+    data = load_data(f"{params.models_dir}/{params.model}/{params.model}.json")
 
     if not params.test and not params.train:
         raise Exception("No graphs to display when both training and testing graphs are disabled")
     if params.test:
         figure = plot_loss(data["test_loss"], "testing", params.loss, params.pitch, params.step, params.duration)
         if params.save:
-            figure.savefig(f"./{params.models_dir}/{params.model}/testing.svg", format="svg")
+            figure.savefig(f"./{params.models_dir}/{params.model}/testing.png", format="png")
     if params.train:
         figure = plot_loss(data["training_loss"], "training", params.loss, params.pitch, params.step, params.duration)
         if params.save:
-            figure.savefig(f"./{params.models_dir}/{params.model}/training.svg", format="svg")
+            figure.savefig(f"./{params.models_dir}/{params.model}/training.png", format="png")
     if not params.save:
         plt.show()
 
