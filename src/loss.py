@@ -9,16 +9,9 @@ class stepLossNoL():
 
     
     @tf.function
-    def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, max: tf.Tensor, min: tf.Tensor):
-        #min = tf.cast(min, tf.float32)
-        #max = tf.cast(min, tf.float32)
-        #min = tf.reshape(min, y_pred.shape)
-        #max = tf.reshape(max, y_pred.shape)
-#
-        #r1 = tf.math.subtract(y_pred, 0) + 1
-        #r2 = tf.math.subtract(max, y_pred)   + 1   
-
-        return mean_squared_error(y_true, y_pred) #cross_entropy_no_log(self.ones, r1)  + cross_entropy_no_log(self.ones, r2) + 1.5 * mean_squared_error(y_true, y_pred) 
+    def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, max: tf.Tensor, num_zero: tf.Tensor):  
+        abs = tf.math.abs(y_pred)
+        return  mean_squared_error(y_true, y_pred)
 
 class durationLossNoL():
     def __init__(self, batch_size: int):
@@ -27,15 +20,15 @@ class durationLossNoL():
     
     @tf.function
     def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor, max: tf.Tensor, min: tf.Tensor):
-        #min = tf.cast(min, tf.float32)
-        #max = tf.cast(min, tf.float32)
-        #min = tf.reshape(min, y_pred.shape)
-        #max = tf.reshape(max, y_pred.shape)
-#
-        #r1 = tf.math.subtract(y_pred, min) + 1
-        #r2 = tf.math.subtract(max, y_pred) + 1
+        min = tf.cast(min, tf.float32)
+        max = tf.cast(max, tf.float32)
+        min = tf.reshape(min, y_pred.shape)
+        max = tf.reshape(max, y_pred.shape) * 2
 
-        return  mean_squared_error(y_true, y_pred) #cross_entropy_no_log(self.ones, r1)  + cross_entropy_no_log(self.ones, r2) + 1.5 *mean_squared_error(y_true, y_pred) 
+        r1 = tf.math.subtract(y_pred, min) + 1
+        r2 = tf.math.subtract(max, y_pred) + 1
+
+        return  (cross_entropy_no_log(self.ones, r1)  + cross_entropy_no_log(self.ones, r2)) + mean_squared_error(y_true, y_pred)
         
 class MusicLossNoL():
     key_weight:     float
