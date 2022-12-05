@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-KEYS = tf.constant([
+KEYS = [
     # Major Keys
     [0, 2, 4, 5, 7, 9, 11],
     [1, 3, 5, 6, 8, 10, 0],
@@ -27,7 +27,7 @@ KEYS = tf.constant([
     [9, 11, 0, 2, 4, 5, 7],
     [10, 0, 1, 3, 5, 6, 8],
     [11, 1, 2, 4, 6, 7, 9],
-], dtype=tf.int64)
+]
 
 import math
 
@@ -74,10 +74,25 @@ def calculate_weighted_keys(keys):
         res.append(oct)
     return res
 
+def weight_next_note(weight):
+    res = []
+    for k in range(0,128):
+        res.append([0]*128)
+        res[k][k] = weight
+    return res
 
-CLAMPED_KEYS = get_clamped_keys()
-CLAMPED_IN_KEY = ensure_in_key(KEYS)
-CLAMPED_IN_KEY_WEIGHTED = calculate_weighted_keys(CLAMPED_IN_KEY)
+@tf.function
+def normalize(tensor: tf.Tensor, min: float = 0 , max: float = 1):
+  repeat = tensor.shape[1]
+  xmin = tf.repeat(tf.reshape(tf.math.reduce_min(tensor, axis=1), shape=[-1,1]), repeats=repeat, axis=1)
+  xmax = tf.repeat(tf.reshape(tf.math.reduce_max(tensor, axis=1), shape=[-1,1]), repeats=repeat, axis=1)
+  tensor = (tensor - xmin) / (xmax-xmin)
+  return tensor * (max - min) + min
+
+CLAMPED_KEYS = tf.constant(get_clamped_keys(), dtype=tf.float64)
+CLAMPED_IN_KEY = tf.constant(ensure_in_key(KEYS), dtype=tf.float64)
+CLAMPED_IN_KEY_WEIGHTED = tf.constant(calculate_weighted_keys(ensure_in_key(KEYS)), dtype=tf.float64)
+WEIGHT_NEXT_NOTE = tf.constant(weight_next_note(2), dtype=tf.float64)
 # Tensorflow consts
 Loss = tf.keras.losses.Loss
 Optimizer = tf.keras.optimizers.Optimizer

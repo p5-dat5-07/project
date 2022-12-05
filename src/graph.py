@@ -87,6 +87,7 @@ class Params:
     """ Parameters for generating loss graphs for the model """
     model:      str                     # Sets the model to generate graphs from.
     models_dir: str     = "./models"    # Sets the models directory.
+    format:     str     = "svg"         # Sets the output format of save
     train:      bool    = True          # Enables graphing for train data.
     test:       bool    = True          # Enables graphing for test data.
     loss:       bool    = True          # Enables loss graph.
@@ -112,11 +113,11 @@ def main():
     if params.test:
         figure = plot_loss(data["test_loss"], "testing", params.loss, params.pitch, params.step, params.duration)
         if params.save:
-            figure.savefig(f"./{params.models_dir}/{params.model}/testing.png", format="png")
+            figure.savefig(f"./{params.models_dir}/{params.model}/testing.{params.format}", format=params.format)
     if params.train:
         figure = plot_loss(data["training_loss"], "training", params.loss, params.pitch, params.step, params.duration)
         if params.save:
-            figure.savefig(f"./{params.models_dir}/{params.model}/training.png", format="png")
+            figure.savefig(f"./{params.models_dir}/{params.model}/training.{params.format}", format=params.format)
     if not params.save:
         plt.show()
 
