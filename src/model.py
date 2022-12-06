@@ -133,10 +133,10 @@ class Model:
         input_shape = (self.params.sequence_length, 3)  
         input_layer = tf.keras.Input(input_shape)
 
-        x = LSTM(256, return_sequences=True)(input_layer)
-        d1 = Dropout(0.3)(x)
+        x = LSTM(512, return_sequences=True)(input_layer)
+        d1 = Dropout(0.1)(x)
 
-        ph1 = LSTM(128, name="pitch_hidden1")(d1)
+        ph1 = LSTM(256, name="pitch_hidden1")(d1)
         sh1 = LSTM(128, name="step_hidden1")(d1)
         dh1 = LSTM(128, name="duration_hidden1")(d1)
 
@@ -144,9 +144,9 @@ class Model:
         sh2 = Dense(30,   name="step_hidden2")(sh1)
         dh2 = Dense(30,   activation="leaky_relu", name="duration_hidden2")(dh1)
 
-        d5 = Dropout(0.3)(ph2)
-        d6 = Dropout(0.3)(sh2)
-        d7 = Dropout(0.3)(dh2)
+        d5 = Dropout(0.1)(ph2)
+        d6 = Dropout(0.1)(sh2)
+        d7 = Dropout(0.1)(dh2)
 
         output_layers = {
             "pitch": Dense(128, name="pitch")(d5),
@@ -198,8 +198,6 @@ class Model:
         self.model.save( f"{model_dir}/{model_name}/{model_name}.h5")
 
         hp = self.params.to_dict()
-        hp['key_weight'] = self.pitch_loss.key_weight
-        hp['octave_weight'] = self.pitch_loss.octave_weight
         hp['seed'] = self.fixed_seed
         jf_dict = {
             'hyperparameters': hp,
