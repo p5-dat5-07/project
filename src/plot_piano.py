@@ -16,30 +16,41 @@ from typing import Dict, List, Optional, Sequence, Tuple
 def main():
   #filenames = glob.glob(str('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models2/large-advanced/epoch20/*.mid*'))
   #print('Number of files:', len(filenames))
-
-  for dirname, dirs, files in os.walk('/final_models2'):
-    for filename in files:
+  max = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0}
+  for dirname, dirs, files in os.walk('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models'):
+    for i, filename in enumerate(files):
       filename_without_extension, extension = os.path.splitext(filename)
       if extension == '.mid':
         pm = pretty_midi.PrettyMIDI(os.path.join(dirname, filename))
-
+        raw_notes = midi_to_notes(os.path.join(dirname, filename))
+        if raw_notes.iloc[-1].end > max[filename_without_extension[-1]]:
+          max[filename_without_extension[-1]] = (raw_notes.iloc[-1].end)
+  
+  for dirname, dirs, files in os.walk('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models'):
+    for i, filename in enumerate(files):
+      filename_without_extension, extension = os.path.splitext(filename)
+      if extension == '.mid':
+        pm = pretty_midi.PrettyMIDI(os.path.join(dirname, filename))
+        
         instrument = pm.instruments[0]
         instrument_name = pretty_midi.program_to_instrument_name(instrument.program)
 
         raw_notes = midi_to_notes(os.path.join(dirname, filename))
 
-        fig = plot_piano_roll(raw_notes)
+        fig = plot_piano_roll(raw_notes, max=max[filename_without_extension[-1]])
+        #plt.show()
+        fig.savefig(f"{os.path.join(dirname, filename_without_extension)}.png", format='png')
+ 
 
-        fig.savefig(f"{os.path.join(dirname, filename_without_extension)}.svg", format='svg')
-
-
-def plot_piano_roll(notes: pd.DataFrame, count: Optional[int] = None):
+def plot_piano_roll(notes: pd.DataFrame, max: int, count: Optional[int] = None):
   if count:
     title = f'First {count} notes'
   else:
     title = f'Whole track'
     count = len(notes['pitch'])
   figure = plt.figure(figsize=(20, 4))
+  plt.xlim([0, max])
+  plt.ylim([0, 120])
   plot_pitch = np.stack([notes['pitch'], notes['pitch']], axis=0)
   plot_start_stop = np.stack([notes['start'], notes['end']], axis=0)
   plt.plot(
