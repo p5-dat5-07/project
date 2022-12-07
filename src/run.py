@@ -1,7 +1,7 @@
 import os
-LOKE  = True
+LOKE  = False
 MÆRSK = False
-SIGNE = False
+SIGNE = True
 
 BASIC       = 0 
 SIMPLE      = 1
@@ -24,10 +24,10 @@ epochs = 20
 
 model_dir   = "./final_models2/"
 data        = "./datasets/ffds400"
-base_command_graph  = f"py src/graph.py --save true"
+base_command_graph  = f"C:\Python39\python.exe src/graph.py --save true"
 graph_format        = f"--format svg"
 graph_dir           = f"--models_dir {model_dir}"
-base_command        = f"py src/main.py --mode train --mode.model_dir {model_dir} --mode.data {data}"
+base_command        = f"C:\Python39\python.exe src/main.py --mode train --mode.model_dir {model_dir} --mode.data {data}"
 scalers_str         = f"--duration_loss_scaler {duration_loss_scaler} --step_loss_scaler {step_loss_scaler}"
 seed_str            = f"--mode.fixed_seed {seed}"
 epoch_str           = f"--epochs {epochs} --epochs_between_samples {epochs_between_samples}"
