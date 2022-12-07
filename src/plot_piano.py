@@ -1,10 +1,6 @@
 import os
 import collections
-import datetime
-import fluidsynth
-import glob
 import numpy as np
-import pathlib
 import pandas as pd
 import pretty_midi
 import seaborn as sns
@@ -17,7 +13,7 @@ def main():
   #filenames = glob.glob(str('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models2/large-advanced/epoch20/*.mid*'))
   #print('Number of files:', len(filenames))
   max = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0}
-  for dirname, dirs, files in os.walk('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models'):
+  for dirname, dirs, files in os.walk(os.getcwd() + '/final_models2'):
     for i, filename in enumerate(files):
       filename_without_extension, extension = os.path.splitext(filename)
       if extension == '.mid':
@@ -25,8 +21,9 @@ def main():
         raw_notes = midi_to_notes(os.path.join(dirname, filename))
         if raw_notes.iloc[-1].end > max[filename_without_extension[-1]]:
           max[filename_without_extension[-1]] = (raw_notes.iloc[-1].end)
+  print(max)
   
-  for dirname, dirs, files in os.walk('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models'):
+  for dirname, dirs, files in os.walk(os.getcwd() + '/final_models2'):
     for i, filename in enumerate(files):
       filename_without_extension, extension = os.path.splitext(filename)
       if extension == '.mid':
@@ -39,8 +36,8 @@ def main():
 
         fig = plot_piano_roll(raw_notes, max=max[filename_without_extension[-1]])
         #plt.show()
-        fig.savefig(f"{os.path.join(dirname, filename_without_extension)}.png", format='png')
- 
+        fig.savefig(f"{os.path.join(dirname, filename_without_extension)}.svg", format='svg')
+  
 
 def plot_piano_roll(notes: pd.DataFrame, max: int, count: Optional[int] = None):
   if count:
