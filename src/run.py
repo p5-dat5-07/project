@@ -22,7 +22,7 @@ octave_weight = 1
 epochs_between_samples = 5
 epochs = 20
 
-model_dir   = "./final_models3/"
+model_dir   = "./final_models4/"
 data        = "./datasets/ffds400"
 base_command_graph  = f"py src/graph.py --save true"
 graph_format        = f"--format svg"
@@ -40,15 +40,15 @@ if MÆRSK:
     os.system(f"{base_command_graph} {graph_format} {graph_dir} --model base-advanced")
 
 if SIGNE:
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-SIMPLE")
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {ADVANCED} --mode.name large-advanced")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {ADVANCED} --mode.name base-advanced")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {SIMPLE} --mode.name large-simple")
+    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-simple")
+    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model base-advanced")
     
 
 if LOKE:
     os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-simple")
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {ADVANCED} --mode.name base-advanced")
-    #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {BASIC} --mode.name large-basic")
-    #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {SIMPLE} --mode.name large-simple")
-    #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-basic")
-    #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-simple")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {ADVANCED} --mode.name large-advanced")
+    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-advanced")
+    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model base-simple")
 
