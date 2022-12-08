@@ -102,3 +102,5 @@ cross_entropy_no_log = tf.keras.losses.BinaryCrossentropy(from_logits=False)
 sparse_entropy = tf.keras.losses.SparseCategoricalCrossentropy(
         from_logits=True) 
 mean_squared_error = tf.keras.losses.MeanSquaredError() 
+
+categorical_cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits=False)

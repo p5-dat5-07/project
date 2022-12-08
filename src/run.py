@@ -22,12 +22,12 @@ octave_weight = 1
 epochs_between_samples = 5
 epochs = 20
 
-model_dir   = "./final_models2/"
+model_dir   = "./final_models3/"
 data        = "./datasets/ffds400"
-base_command_graph  = f"C:\Python39\python.exe src/graph.py --save true"
+base_command_graph  = f"py src/graph.py --save true"
 graph_format        = f"--format svg"
 graph_dir           = f"--models_dir {model_dir}"
-base_command        = f"C:\Python39\python.exe src/main.py --mode train --mode.model_dir {model_dir} --mode.data {data}"
+base_command        = f"py src/main.py --mode train --mode.model_dir {model_dir} --mode.data {data}"
 scalers_str         = f"--duration_loss_scaler {duration_loss_scaler} --step_loss_scaler {step_loss_scaler}"
 seed_str            = f"--mode.fixed_seed {seed}"
 epoch_str           = f"--epochs {epochs} --epochs_between_samples {epochs_between_samples}"
@@ -45,8 +45,9 @@ if SIGNE:
     
 
 if LOKE:
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {BASIC} --mode.name large-basic")
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {SIMPLE} --mode.name large-simple")
-    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-basic")
-    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-simple")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {ADVANCED} --mode.name base-advanced")
+    #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {BASIC} --mode.name large-basic")
+    #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {SIMPLE} --mode.name large-simple")
+    #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-basic")
+    #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-simple")
 

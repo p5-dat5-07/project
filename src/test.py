@@ -1,4 +1,5 @@
 import tensorflow as tf
+import json
 KEYS = [
     # Major Keys
     [0, 2, 4, 5, 7, 9, 11],
@@ -111,7 +112,7 @@ x = tf.constant([
 #print(rescale(x))
 #print(rescale(x))
 #import json
-#with open('filename1.json', 'w') as f:
-#    f.write(json.dumps({"a":step_4.numpy().tolist()}))
+with open('filename1.json', 'w') as f:
+    f.write(json.dumps({"a":step_4.numpy().tolist()}, indent=4))
 x = tf.random.uniform((50,), -10, 10)
 print(tf.maximum(x, 0))
