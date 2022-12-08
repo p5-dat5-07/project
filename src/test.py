@@ -99,11 +99,12 @@ predictions = tf.cast([96]*50, dtype=tf.int64)
 step_1 = tf.gather(CLAMPED_IN_KEY_WEIGHTED, octaves, axis=0)
 step_2 = tf.gather(step_1, key, axis=1, batch_dims=1)
 step_3 = step_2 + tf.gather(WEIGHT_NEXT_NOTE, predictions, axis=0)
-step_4 = rescale(step_3) # normalize vector
+step_4 = tf.nn.softmax(tf.nn.relu(step_3)) # normalize vector
 x = tf.constant([
     [2, 0, 0, 1],
     [5, 0, 0, 1]
 ])
+print(tf.reduce_sum(step_4).numpy())
 #print(step_1)
 #print(step_2)
 #print(step_3)
@@ -112,7 +113,7 @@ x = tf.constant([
 #print(rescale(x))
 #print(rescale(x))
 #import json
-with open('filename1.json', 'w') as f:
-    f.write(json.dumps({"a":step_4.numpy().tolist()}, indent=4))
-x = tf.random.uniform((50,), -10, 10)
-print(tf.maximum(x, 0))
+#with open('filename1.json', 'w') as f:
+#    f.write(json.dumps({"a":step_4.numpy().tolist()}, indent=4))
+#x = tf.random.uniform((50,), -10, 10)
+#print(tf.maximum(x, 0))
