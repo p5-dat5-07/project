@@ -96,15 +96,32 @@ octaves = tf.cast([8]*50,dtype=tf.int64)
 key = tf.cast([1]*50,dtype=tf.int64)
 predictions = tf.cast([96]*50, dtype=tf.int64)
 
+octaves_1 = tf.cast([4]*50,dtype=tf.int64)
+key_2 = tf.cast([2]*50,dtype=tf.int64)
+predictions_3 = tf.cast([74]*50, dtype=tf.int64)
+
 step_1 = tf.gather(CLAMPED_IN_KEY_WEIGHTED, octaves, axis=0)
 step_2 = tf.gather(step_1, key, axis=1, batch_dims=1)
 step_3 = step_2 + tf.gather(WEIGHT_NEXT_NOTE, predictions, axis=0)
 step_4 = tf.nn.softmax(tf.nn.relu(step_3)) # normalize vector
-x = tf.constant([
-    [2, 0, 0, 1],
-    [5, 0, 0, 1]
-])
-print(tf.reduce_sum(step_4).numpy())
+
+step_1_1 = tf.gather(CLAMPED_IN_KEY_WEIGHTED, octaves_1, axis=0)
+step_2_2 = tf.gather(step_1_1, key_2, axis=1, batch_dims=1)
+step_3_3 = step_2_2 + tf.gather(WEIGHT_NEXT_NOTE, predictions_3, axis=0)
+step_4_4 = tf.nn.softmax(tf.nn.relu(step_3_3)) # normalize vector
+x = tf.nn.softmax(tf.nn.relu(tf.constant([
+    [0.25, 0.0, 0.25, 0.25]
+], dtype=tf.float32)))
+
+y = tf.constant([
+    [0.25, 0.0, 0.25, 0.25]
+], dtype=tf.float32)
+
+# Zero is no good soooo add epsilojh
+@tf.function
+def true_cross_entropy(y_true, y_pred):
+    return -tf.reduce_sum((y_true) * tf.nn.log_softmax(y_pred, axis=1), axis=1)
+print(true_cross_entropy(x,y))
 #print(step_1)
 #print(step_2)
 #print(step_3)

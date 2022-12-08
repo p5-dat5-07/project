@@ -55,7 +55,7 @@ def ensure_in_key(keys):
     return res
 
 def calculate_weighted_keys(keys):
-    offset = 0.5
+    offset = -2
     res = []
     for octave in range(11):
         oct = []
@@ -89,18 +89,20 @@ def normalize(tensor: tf.Tensor, min: float = 0 , max: float = 1):
   tensor = (tensor - xmin) / (xmax-xmin)
   return tensor * (max - min) + min
 
-CLAMPED_KEYS = tf.constant(get_clamped_keys(), dtype=tf.float64)
-CLAMPED_IN_KEY = tf.constant(ensure_in_key(KEYS), dtype=tf.float64)
-CLAMPED_IN_KEY_WEIGHTED = tf.constant(calculate_weighted_keys(ensure_in_key(KEYS)), dtype=tf.float64)
-WEIGHT_NEXT_NOTE = tf.constant(weight_next_note(2), dtype=tf.float64)
+CLAMPED_KEYS = tf.constant(get_clamped_keys(), dtype=tf.float32)
+CLAMPED_IN_KEY = tf.constant(ensure_in_key(KEYS), dtype=tf.float32)
+CLAMPED_IN_KEY_WEIGHTED = tf.constant(calculate_weighted_keys(ensure_in_key(KEYS)), dtype=tf.float32)
+WEIGHT_NEXT_NOTE = tf.constant(weight_next_note(2), dtype=tf.float32)
 # Tensorflow consts
 Loss = tf.keras.losses.Loss
 Optimizer = tf.keras.optimizers.Optimizer
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 cross_entropy_no_log = tf.keras.losses.BinaryCrossentropy(from_logits=False)
-
+categorical_cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 sparse_entropy = tf.keras.losses.SparseCategoricalCrossentropy(
         from_logits=True) 
 mean_squared_error = tf.keras.losses.MeanSquaredError() 
 
-categorical_cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
+@tf.function
+def true_cross_entropy(y_true, y_pred):
+    return -tf.reduce_mean(tf.reduce_sum((y_true) * tf.nn.log_softmax(y_pred, axis=1), axis=1),0)

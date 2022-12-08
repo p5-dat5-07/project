@@ -101,9 +101,9 @@ res = []
 for file in sample_files:
     key = base[int(file[-5:-4])-1]
     notes = midi_to_notes(file, 1)
-    fail, ok = in_key(notes["pitch"][64:64+20], key)
-    leaps, average = _leaps(notes["pitch"][63:63+21])
-    length = len(notes["pitch"][64:64+20])
+    fail, ok = in_key(notes["pitch"][64:], key)
+    leaps, average = _leaps(notes["pitch"][63:])
+    length = len(notes["pitch"][64:])
     res.append({"name": file, "notes": length, "key": key, "fail": fail, "ok": ok, "ok ratio": ok/length, "fail ratio": fail/length,  "leaps": leaps, "average leap": average})
 
 with open("./res2.json", "w") as f:

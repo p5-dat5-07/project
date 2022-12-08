@@ -57,8 +57,8 @@ class MusicLossSimple():
         predictions = tf.cast(y_true, dtype=tf.int64)
         step_1 = tf.gather(CLAMPED_IN_KEY, key, axis=0)
         step_2 = tf.gather(WEIGHT_NEXT_NOTE, predictions, axis=0)
-        step_3 = tf.nn.softmax(tf.nn.relu((step_1 + step_2)))
-        return cross_entropy_no_log(step_3, y_pred)
+        step_3 = normalize(step_1 + step_2)
+        return cross_entropy(step_3, y_pred)
 
 class MusicLossAdvanced():
     key_weight:     float
@@ -75,5 +75,6 @@ class MusicLossAdvanced():
         step_1 = tf.gather(CLAMPED_IN_KEY_WEIGHTED, octaves, axis=0)
         step_2 = tf.gather(step_1, key, axis=1, batch_dims=1)
         step_3 = tf.gather(WEIGHT_NEXT_NOTE, predictions, axis=0)
-        step_4 = tf.nn.softmax(tf.nn.relu((step_2 + step_3)))
-        return cross_entropy_no_log(step_4, y_pred)
+        step_4 = normalize(step_2 + step_3)
+        return cross_entropy(step_4, y_pred)
+

@@ -40,12 +40,13 @@ if MÆRSK:
     os.system(f"{base_command_graph} {graph_format} {graph_dir} --model base-advanced")
 
 if SIGNE:
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {BASIC} --mode.name base-basic")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-SIMPLE")
     os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {ADVANCED} --mode.name large-advanced")
     
 
 if LOKE:
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-advanced")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-simple")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {ADVANCED} --mode.name base-advanced")
     #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {BASIC} --mode.name large-basic")
     #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {SIMPLE} --mode.name large-simple")
     #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-basic")
