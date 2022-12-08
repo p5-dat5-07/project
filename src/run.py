@@ -1,7 +1,7 @@
 import os
-LOKE  = False
+LOKE  = True
 MÆRSK = False
-SIGNE = True
+SIGNE = False
 
 BASIC       = 0 
 SIMPLE      = 1
@@ -45,7 +45,7 @@ if SIGNE:
     
 
 if LOKE:
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {ADVANCED} --mode.name base-advanced")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-advanced")
     #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {BASIC} --mode.name large-basic")
     #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {SIMPLE} --mode.name large-simple")
     #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-basic")

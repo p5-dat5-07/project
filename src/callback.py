@@ -36,7 +36,6 @@ class Cb1(Callback):
                 self.test_pitch_loss = 0.0
                 self.test_step_loss = 0.0
                 self.test_duration_loss = 0.0
-                self.start = tf.timestamp()
 
             self.test_pitch_loss      += pitch 
             self.test_step_loss       += step 
@@ -48,8 +47,7 @@ class Cb1(Callback):
                 avg_step_loss = self.test_step_loss / i
                 avg_duration_loss = self.test_duration_loss / i
                 tf.print(
-                    "Test loss (avg) at step ", i-1, "(", tf.math.floor((tf.timestamp() - self.start)), "s) - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
-                self.start = tf.timestamp()
+                    "Test loss (avg) at step ", i-1," - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
         elif (mode == 'train'):
             if i == max_step:
                 self.train_list[0].append((self.all_pitch_loss.numpy() + self.all_step_loss.numpy() + self.all_duration_loss.numpy()) / max_step)
@@ -60,7 +58,6 @@ class Cb1(Callback):
                 self.all_pitch_loss = 0.0
                 self.all_step_loss = 0.0
                 self.all_duration_loss = 0.0
-                self.start = tf.timestamp()
 
             self.all_pitch_loss      += pitch 
             self.all_step_loss       += step 
@@ -72,5 +69,4 @@ class Cb1(Callback):
                 avg_step_loss = self.all_step_loss / i
                 avg_duration_loss = self.all_duration_loss / i
                 tf.print(
-                    "Training loss (avg) at step ", i-1, "(", tf.math.floor((tf.timestamp() - self.start)), "s) - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)
-                self.start = tf.timestamp()
+                    "Training loss (avg) at step ", i-1, " - Loss: ", avg_pitch_loss + avg_step_loss + avg_duration_loss, " - pitch: ", avg_pitch_loss, ", step: ", avg_step_loss, ", duration: ", avg_duration_loss)

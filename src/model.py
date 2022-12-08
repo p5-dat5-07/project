@@ -37,6 +37,8 @@ class Model:
         self.fixed_seed     = fixed_seed
         if self.fixed_seed != 0:
             tf.keras.utils.set_random_seed(self.fixed_seed)
+            tf.config.experimental.enable_op_determinism()
+
 
     def load(self, model_name):
         self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
