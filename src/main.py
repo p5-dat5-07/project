@@ -52,12 +52,12 @@ def main():
     elif type(mode) is Generate:
         mode: Generate = mode
         model = Model(
-            params=params, pitch_loss=MusicLoss(params.batch_size),
+            params=params, pitch_loss=MusicLossBasic(),
             step_loss=mean_squared_error, duration_loss=mean_squared_error,
             optimizer = tf.keras.optimizers.Adam(learning_rate=params.learning_rate),
             fixed_seed=mode.fixed_seed
         )
-        model.load(mode.name)
+        model.load(mode.name, mode.model_dir)
         if os.path.isdir(mode.input):
             files = glob.glob(str(pathlib.Path(mode.input)/"**/*.mid*"), recursive=True)
             if not os.path.exists(mode.output):

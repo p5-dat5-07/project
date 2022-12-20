@@ -39,8 +39,8 @@ class Model:
             tf.keras.utils.set_random_seed(self.fixed_seed)
 
 
-    def load(self, model_name):
-        self.model = tf.keras.models.load_model(f"./models/{model_name}/{model_name}.h5")
+    def load(self, model_name, model_dir):
+        self.model = tf.keras.models.load_model(f"{model_dir}{model_name}/{model_name}.h5")
     
     def load_dataset(self, data_path: str, sample_dir: str):
         full_dataset = tf.data.Dataset.load(data_path)
@@ -194,6 +194,7 @@ class Model:
                 os.mkdir(f"{model_dir}/{model_name}/epoch{epoch}")
                 for i in range(1, self.params.samples_per_epoch+1):
                     print(f"generating sample: {i}")
+                    print(self.files[self.params.sample_location+i])
                     self.generate_notes(self.files[self.params.sample_location+i], f"{model_dir}/{model_name}/epoch{epoch}/{model_name}_{epoch}_{i}.mid")
         
         self.model.save( f"{model_dir}/{model_name}/{model_name}.h5")
@@ -330,9 +331,11 @@ class Model:
         step = predictions["step"]
         duration = predictions["duration"]
 
-        pitch_logits /= temperature
-        pitch = tf.random.categorical(pitch_logits, num_samples=1)
-        pitch = tf.squeeze(pitch, axis=-1)
+        #pitch_logits /= 1.0
+        #pitch = tf.random.categorical(pitch_logits, 1)
+        #pitch = tf.squeeze(pitch, axis=-1)
+        #pitch = tf.gather(pitches.indices, pitch, axis=-1)
+        pitch = tf.argmax(pitch_logits, axis=-1)
         duration = tf.squeeze(duration, axis=-1)
         step = tf.squeeze(step, axis=-1)
 
@@ -341,6 +344,4 @@ class Model:
         duration = tf.maximum(0, duration)
 
         return int(pitch), float(step), float(duration)
-    
-
     

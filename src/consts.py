@@ -55,7 +55,6 @@ def ensure_in_key(keys):
     return res
 
 def calculate_weighted_keys(keys):
-    offset = -2
     res = []
     for octave in range(11):
         oct = []
@@ -67,7 +66,7 @@ def calculate_weighted_keys(keys):
                 if diff == 0:
                     t_key.append(key[i])
                 elif key[i] == 1 and diff !=0:
-                    t_key.append(round(sigmoid(-diff + offset), 3))
+                    t_key.append(round(sigmoid(-diff), 3))
                 else:
                     t_key.append(0)
             oct.append(t_key)

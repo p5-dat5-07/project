@@ -10,6 +10,7 @@ class Generate(Base):
     output:     str             # The output directory or file to write the midi sequence(s) to.
     amount:     int = 1         # The amount of versions generated per input file.
     name:       str = "model"   # The name of the model.
+    model_dir:  str = "./models"
     fixed_seed: int = 0         # Sets fixed seed 
 
 

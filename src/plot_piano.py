@@ -12,7 +12,7 @@ def main():
   #filenames = glob.glob(str('C:/Users/signe/OneDrive/Skrivebord/P5/project/final_models2/large-advanced/epoch20/*.mid*'))
   #print('Number of files:', len(filenames))
   max = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0}
-  for dirname, dirs, files in os.walk(os.getcwd() + '/final_models3'):
+  for dirname, dirs, files in os.walk(os.getcwd() + '/final_models4'):
     for i, filename in enumerate(files):
       filename_without_extension, extension = os.path.splitext(filename)
       if extension == '.mid':
@@ -22,7 +22,7 @@ def main():
           max[filename_without_extension[-1]] = (raw_notes.iloc[-1].end)
   print(max)
   
-  for dirname, dirs, files in os.walk(os.getcwd() + '/final_models3'):
+  for dirname, dirs, files in os.walk(os.getcwd() + '/final_models4'):
     for i, filename in enumerate(files):
       filename_without_extension, extension = os.path.splitext(filename)
       if extension == '.mid':

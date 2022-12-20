@@ -20,9 +20,9 @@ key_weight = 1
 octave_weight = 1
 
 epochs_between_samples = 5
-epochs = 20
+epochs = 6
 
-model_dir   = "./final_models4/"
+model_dir   = "./final_models5/"
 data        = "./datasets/ffds400"
 base_command_graph  = f"py src/graph.py --save true"
 graph_format        = f"--format svg"
@@ -47,8 +47,8 @@ if SIGNE:
     
 
 if LOKE:
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-simple")
-    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {ADVANCED} --mode.name large-advanced")
-    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-advanced")
-    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model base-simple")
+    #os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {BASE} --mode.music_theory {SIMPLE} --mode.name base-simple")
+    os.system(f"{base_command} {scalers_str} {seed_str} {epoch_str} --mode.model {LARGE} --mode.music_theory {ADVANCED} --mode.name large-advanced-w10")
+    os.system(f"{base_command_graph} {graph_format} {graph_dir} --model large-advanced-w10")
+    #os.system(f"{base_command_graph} {graph_format} {graph_dir} --model base-simple")
 
