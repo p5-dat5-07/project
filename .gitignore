@@ -3,3 +3,5 @@ data
 *.midi
 training_checkpoints
 __pycache__
+*models*
+datasets

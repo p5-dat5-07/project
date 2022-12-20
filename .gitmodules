@@ -1,0 +1,3 @@
+[submodule "pretty-midi-rs"]
+	path = pretty-midi-rs
+	url = git@github.com:jonasKjellerup/pretty-midi-rs.git
